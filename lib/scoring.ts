@@ -946,26 +946,27 @@ export const INTEREST_KEYWORDS: Record<string, KeywordEntry> = {
     weight: 1.0
   },
   "Social Networks": {
-    canonical: "network",
+    canonical: "social network",
     synonyms: [
-      "social network", "peer effect", "social connection",
-      "network analysis", "social capital", "ties", "centrality"
+      "peer effect", "peer effects", "social connection", "social connections",
+      "network analysis", "social capital", "network ties", "centrality",
+      "social tie", "friendship network", "network structure"
     ],
     weight: 0.95
   },
   "Media and Information": {
-    canonical: "media",
+    canonical: "news media",
     synonyms: [
-      "news", "journalism", "press", "newspaper", "television",
-      "information", "media effects", "communication"
+      "journalism", "press coverage", "newspaper", "television news",
+      "media bias", "media effects", "mass media", "broadcast"
     ],
     weight: 0.9
   },
   "Social Media and Digital Platforms": {
     canonical: "social media",
     synonyms: [
-      "facebook", "twitter", "platform", "online", "digital",
-      "internet", "viral", "tech platform", "app"
+      "facebook", "twitter", "instagram", "tiktok", "platform economy",
+      "online platform", "digital platform", "viral spread", "tech platform"
     ],
     weight: 1.0
   },
@@ -1215,7 +1216,8 @@ export class RelevanceScorer {
       return [0.0, []];
     }
 
-    const matched: string[] = [];
+    const matched: string[] = [];      // For display tags - conservative
+    const scoredInterests: string[] = []; // For scoring - more inclusive
     const scores: number[] = [];
 
     for (let i = 0; i < this.profile.interests.length; i++) {
@@ -1228,10 +1230,16 @@ export class RelevanceScorer {
       const [count, score] = countKeywordMatches(text, entry);
 
       if (count > 0) {
-        matched.push(interest);
+        scoredInterests.push(interest);
         // Position weight: first = 1.0, later = less
         const posWeight = Math.max(0.6, 1.0 - i * 0.08);
         scores.push(score * posWeight);
+        
+        // Only tag for display if there's strong evidence (2+ keyword matches)
+        // This prevents false positives from generic terms like "network" or "media"
+        if (count >= 2) {
+          matched.push(interest);
+        }
       }
     }
 
@@ -1243,8 +1251,8 @@ export class RelevanceScorer {
     let combined = best * 0.6 + avg * 0.4;
 
     // Bonus for multiple strong matches
-    if (matched.length >= 3) combined *= 1.2;
-    else if (matched.length >= 2) combined *= 1.1;
+    if (scoredInterests.length >= 3) combined *= 1.2;
+    else if (scoredInterests.length >= 2) combined *= 1.1;
 
     return [Math.min(1.0, combined), matched];
   }
@@ -1258,7 +1266,8 @@ export class RelevanceScorer {
       return [0.0, []];
     }
 
-    const matched: string[] = [];
+    const matched: string[] = [];        // For display tags - conservative
+    const scoredMethods: string[] = [];  // For scoring - more inclusive
     const scores: number[] = [];
 
     for (let i = 0; i < this.profile.methods.length; i++) {
@@ -1271,9 +1280,14 @@ export class RelevanceScorer {
       const [count, score] = countKeywordMatches(text, entry);
 
       if (count > 0) {
-        matched.push(method);
+        scoredMethods.push(method);
         const posWeight = Math.max(0.5, 1.0 - i * 0.1);
         scores.push(score * posWeight);
+        
+        // Only tag for display if there's strong evidence (2+ keyword matches)
+        if (count >= 2) {
+          matched.push(method);
+        }
       }
     }
 
@@ -1283,7 +1297,7 @@ export class RelevanceScorer {
     const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
     let combined = best * 0.7 + avg * 0.3;
 
-    if (matched.length >= 2) combined *= 1.15;
+    if (scoredMethods.length >= 2) combined *= 1.15;
 
     return [Math.min(1.0, combined), matched];
   }

@@ -13,7 +13,7 @@ import {
   Lightbulb,
   Globe
 } from "lucide-react";
-import { ProgressDots, PaperCard, Loading, MultiSelect } from "@/components";
+import { ProgressDots, PaperCard, Loading, FunLoading, MultiSelect } from "@/components";
 import { 
   getProfileOptions, 
   getGroupedOptions,
@@ -770,7 +770,7 @@ function StepResults({ state, updateState, startOver, discoverPapers, goToStep }
   if (state.isLoading) {
     return (
       <div className="animate-fade-in">
-        <Loading message={`Finding papers for you, ${state.name}...`} />
+        <FunLoading userName={state.name} />
       </div>
     );
   }
@@ -799,7 +799,7 @@ function StepResults({ state, updateState, startOver, discoverPapers, goToStep }
     discoverPapers();
     return (
       <div className="animate-fade-in">
-        <Loading message={`Finding papers for you, ${state.name}...`} />
+        <FunLoading userName={state.name} />
       </div>
     );
   }
