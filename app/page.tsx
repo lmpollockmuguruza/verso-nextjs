@@ -642,9 +642,11 @@ function StepSources({ state, updateState, nextStep, prevStep, discoverPapers }:
     }
   };
 
-  const handleDiscover = async () => {
-    await discoverPapers();
+  const handleDiscover = () => {
+    // Move to results page immediately to show loading screen
     nextStep();
+    // Then start fetching (async, will update state when done)
+    discoverPapers();
   };
 
   return (
@@ -794,9 +796,23 @@ function StepResults({ state, updateState, startOver, discoverPapers, goToStep }
     );
   }
 
-  // Handle empty results
-  if (!state.papers.length) {
-    discoverPapers();
+  // Handle empty results (user hasn't loaded papers yet)
+  if (!state.papers.length && !state.isLoading) {
+    return (
+      <div className="animate-fade-in">
+        <FunLoading userName={state.name} />
+        <div className="mt-6 text-center">
+          <button onClick={() => discoverPapers()} className="btn-primary">
+            <Sparkles className="h-4 w-4" />
+            Load Papers
+          </button>
+        </div>
+      </div>
+    );
+  }
+  
+  // Handle loading in progress
+  if (!state.papers.length && state.isLoading) {
     return (
       <div className="animate-fade-in">
         <FunLoading userName={state.name} />

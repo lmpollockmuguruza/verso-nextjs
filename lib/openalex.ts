@@ -183,9 +183,10 @@ export function processPaper(work: OpenAlexWork): Paper | null {
     ? `https://doi.org/${doi.replace("https://doi.org/", "")}`
     : undefined;
 
-  // Journal tier
+  // Journal info
   const journal = ALL_JOURNALS[journalName];
   const journalTier = journal?.tier || 4;
+  const journalField = journal?.field;
 
   return {
     id: (work.id || "").replace("https://openalex.org/", ""),
@@ -197,6 +198,7 @@ export function processPaper(work: OpenAlexWork): Paper | null {
     abstract,
     journal: journalName,
     journal_tier: journalTier,
+    journal_field: journalField,
     publication_date: work.publication_date || "",
     concepts,
     cited_by_count: work.cited_by_count || 0,
@@ -240,50 +242,79 @@ export async function fetchRecentPapers(
   const fromDate = startDate.toISOString().split("T")[0];
   const toDate = endDate.toISOString().split("T")[0];
 
-  // Get ISSNs for selected journals
-  let issns: string[];
-  if (selectedJournals && selectedJournals.length > 0) {
-    issns = selectedJournals
-      .filter((j) => ALL_JOURNALS[j])
-      .map((j) => ALL_JOURNALS[j].issn);
-  } else {
-    issns = Object.values(ALL_JOURNALS).map((j) => j.issn);
+  // Get ISSNs and OpenAlex source IDs for selected journals
+  let issns: string[] = [];
+  let sourceIds: string[] = [];
+  
+  const journalsToQuery = selectedJournals && selectedJournals.length > 0
+    ? selectedJournals.filter((j) => ALL_JOURNALS[j])
+    : Object.keys(ALL_JOURNALS);
+    
+  for (const journalName of journalsToQuery) {
+    const journal = ALL_JOURNALS[journalName];
+    if (journal?.issn) {
+      issns.push(journal.issn);
+    }
+    if (journal?.openAlexId) {
+      sourceIds.push(journal.openAlexId);
+    }
   }
 
-  if (!issns.length) return [];
+  if (!issns.length && !sourceIds.length) return [];
 
-  const issnFilter = issns.join("|");
+  // Build filter - combine ISSN filter and source ID filter with OR
+  const filterParts: string[] = [];
+  filterParts.push(`from_publication_date:${fromDate}`);
+  filterParts.push(`to_publication_date:${toDate}`);
+  
+  // For sources, we need to use a combined filter
+  // OpenAlex allows: primary_location.source.issn:X|Y|Z OR primary_location.source.id:A|B|C
+  const sourceFilters: string[] = [];
+  if (issns.length > 0) {
+    sourceFilters.push(`primary_location.source.issn:${issns.join("|")}`);
+  }
+  if (sourceIds.length > 0) {
+    sourceFilters.push(`primary_location.source.id:${sourceIds.join("|")}`);
+  }
+  
   const papers: Paper[] = [];
-  let cursor = "*";
+  
+  // If we have both ISSNs and source IDs, we need to make separate queries
+  // because OpenAlex doesn't support OR across different filter fields easily
+  for (const sourceFilter of sourceFilters) {
+    let cursor = "*";
+    
+    while (papers.length < maxResults) {
+      const params: Record<string, string> = {
+        filter: `${sourceFilter},from_publication_date:${fromDate},to_publication_date:${toDate}`,
+        per_page: String(Math.min(perPage, maxResults - papers.length)),
+        cursor,
+        select: OPENALEX_CONFIG.SELECT_FIELDS,
+        mailto: OPENALEX_CONFIG.POLITE_EMAIL,
+      };
 
-  while (papers.length < maxResults) {
-    const params: Record<string, string> = {
-      filter: `primary_location.source.issn:${issnFilter},from_publication_date:${fromDate},to_publication_date:${toDate},type:article`,
-      per_page: String(Math.min(perPage, maxResults - papers.length)),
-      cursor,
-      select: OPENALEX_CONFIG.SELECT_FIELDS,
-      mailto: OPENALEX_CONFIG.POLITE_EMAIL,
-    };
+      const data = await makeRequestWithRetry(OPENALEX_CONFIG.BASE_URL, params);
+      const results = data.results || [];
 
-    const data = await makeRequestWithRetry(OPENALEX_CONFIG.BASE_URL, params);
-    const results = data.results || [];
+      if (!results.length) break;
 
-    if (!results.length) break;
-
-    for (const work of results) {
-      const processed = processPaper(work);
-      if (processed) {
-        papers.push(processed);
-        if (papers.length >= maxResults) break;
+      for (const work of results) {
+        const processed = processPaper(work);
+        if (processed) {
+          papers.push(processed);
+          if (papers.length >= maxResults) break;
+        }
       }
+
+      // Get next cursor for pagination
+      cursor = data.meta?.next_cursor || "";
+      if (!cursor) break;
+
+      // Polite rate limiting
+      await delay(OPENALEX_CONFIG.RATE_LIMIT_DELAY);
     }
-
-    // Get next cursor for pagination
-    cursor = data.meta?.next_cursor || "";
-    if (!cursor) break;
-
-    // Polite rate limiting
-    await delay(OPENALEX_CONFIG.RATE_LIMIT_DELAY);
+    
+    if (papers.length >= maxResults) break;
   }
 
   return papers;

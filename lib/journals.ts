@@ -18,6 +18,19 @@ import type { Journal, JournalOptions, JournalField } from "./types";
 // ═══════════════════════════════════════════════════════════════════════════
 
 export const ECONOMICS_JOURNALS: Record<string, Journal> = {
+  // Working Paper Series (Pre-prints / Cutting Edge)
+  "NBER Working Papers": {
+    name: "NBER Working Papers",
+    issn: "0898-2937",
+    field: "economics",
+    tier: 1,
+  },
+  "CEPR Discussion Papers": {
+    name: "CEPR Discussion Papers",
+    openAlexId: "S4210174296",
+    field: "economics",
+    tier: 1,
+  },
   // Tier 1 - Top 5
   "American Economic Review": {
     name: "American Economic Review",

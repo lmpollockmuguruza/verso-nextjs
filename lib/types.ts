@@ -11,7 +11,8 @@ export type JournalField =
 
 export interface Journal {
   name: string;
-  issn: string;
+  issn?: string;        // Optional - some sources (like CEPR) don't have ISSNs
+  openAlexId?: string;  // OpenAlex source ID for sources without ISSN
   field: JournalField;
   tier: 1 | 2 | 3;
 }
