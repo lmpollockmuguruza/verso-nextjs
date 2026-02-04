@@ -14,16 +14,15 @@
 import type { Journal, JournalOptions, JournalField } from "./types";
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ECONOMICS JOURNALS
+// WORKING PAPERS (Pre-prints / Cutting Edge Research)
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const ECONOMICS_JOURNALS: Record<string, Journal> = {
-  // Working Paper Series (Pre-prints / Cutting Edge)
+export const WORKING_PAPERS: Record<string, Journal> = {
   // NBER Working Papers - uses ISSN 0898-2937
   "NBER Working Papers": {
     name: "NBER Working Papers",
     issn: "0898-2937",
-    field: "economics",
+    field: "working_papers",
     tier: 1,
     altNames: [
       "National Bureau of Economic Research", 
@@ -32,11 +31,11 @@ export const ECONOMICS_JOURNALS: Record<string, Journal> = {
       "NBER",
     ],
   },
-  // CEPR Discussion Papers - search for name variations
+  // CEPR Discussion Papers
   "CEPR Discussion Papers": {
     name: "CEPR Discussion Papers",
-    issn: "0800-2785", // CEPR DP ISSN
-    field: "economics",
+    issn: "0800-2785",
+    field: "working_papers",
     tier: 1,
     altNames: [
       "Centre for Economic Policy Research",
@@ -45,6 +44,13 @@ export const ECONOMICS_JOURNALS: Record<string, Journal> = {
       "CEPR",
     ],
   },
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ECONOMICS JOURNALS
+// ═══════════════════════════════════════════════════════════════════════════
+
+export const ECONOMICS_JOURNALS: Record<string, Journal> = {
   // Tier 1 - Top 5
   "American Economic Review": {
     name: "American Economic Review",
@@ -647,8 +653,9 @@ export const ADJACENT_JOURNALS: Record<string, Journal> = {
   ...MANAGEMENT_JOURNALS,
 };
 
-// All journals
+// All journals (includes working papers)
 export const ALL_JOURNALS: Record<string, Journal> = {
+  ...WORKING_PAPERS,
   ...CORE_JOURNALS,
   ...ADJACENT_JOURNALS,
 };
@@ -669,7 +676,13 @@ export function getJournalsByField(field: JournalField): Record<string, Journal>
       return SOCIOLOGY_JOURNALS;
     case "management":
       return MANAGEMENT_JOURNALS;
+    case "working_papers":
+      return WORKING_PAPERS;
   }
+}
+
+export function getWorkingPapers(): string[] {
+  return Object.keys(WORKING_PAPERS);
 }
 
 export function getEconomicsJournals(): string[] {

@@ -25,7 +25,8 @@ import {
   getJournalOptions, 
   getCoreJournals,
   getAdjacentJournals,
-  getJournalsByTier 
+  getJournalsByTier,
+  getWorkingPapers
 } from "@/lib/journals";
 import type { ScoredPaper, UserProfile, ApproachPreference, JournalField } from "@/lib/types";
 
@@ -52,6 +53,7 @@ interface AppState {
   methods: string[];
   region: string;
   fieldType: "Economics" | "Political Science" | "Both";
+  includeWorkingPapers: boolean;
   includeAdjacentFields: boolean;
   selectedAdjacentFields: JournalField[];
   journals: string[];
@@ -72,6 +74,7 @@ const initialState: AppState = {
   methods: [],
   region: "Global / No Preference",
   fieldType: "Both",
+  includeWorkingPapers: true,  // Include NBER/CEPR by default
   includeAdjacentFields: false,
   selectedAdjacentFields: [],
   journals: [],
@@ -607,18 +610,47 @@ function StepMethods({ state, updateState, nextStep, prevStep }: StepProps) {
 function StepSources({ state, updateState, nextStep, prevStep, discoverPapers }: StepProps) {
   const [showAdjacentOptions, setShowAdjacentOptions] = useState(state.includeAdjacentFields);
   
-  const setFieldType = (type: "Economics" | "Political Science" | "Both") => {
-    updateState({ fieldType: type });
-    
-    // Auto-select tier 1 & 2 journals
+  // Helper to build journal list based on current selections
+  const buildJournalList = (
+    fieldType: "Economics" | "Political Science" | "Both",
+    includeWPs: boolean,
+    adjacentFields: JournalField[]
+  ) => {
     let selected: string[] = [];
-    if (type === "Economics" || type === "Both") {
+    
+    // Add working papers if enabled
+    if (includeWPs) {
+      selected = [...selected, ...getWorkingPapers()];
+    }
+    
+    // Add core field journals
+    if (fieldType === "Economics" || fieldType === "Both") {
       selected = [...selected, ...journalOptions.economics.tier1, ...journalOptions.economics.tier2];
     }
-    if (type === "Political Science" || type === "Both") {
+    if (fieldType === "Political Science" || fieldType === "Both") {
       selected = [...selected, ...journalOptions.polisci.tier1, ...journalOptions.polisci.tier2];
     }
-    updateState({ journals: selected });
+    
+    // Add adjacent fields
+    for (const field of adjacentFields) {
+      const adjacentJournals = getJournalsByTier(field, [1, 2]);
+      selected = [...selected, ...adjacentJournals];
+    }
+    
+    return selected;
+  };
+  
+  const setFieldType = (type: "Economics" | "Political Science" | "Both") => {
+    updateState({ fieldType: type });
+    const journals = buildJournalList(type, state.includeWorkingPapers, state.selectedAdjacentFields);
+    updateState({ journals });
+  };
+  
+  const toggleWorkingPapers = () => {
+    const newValue = !state.includeWorkingPapers;
+    updateState({ includeWorkingPapers: newValue });
+    const journals = buildJournalList(state.fieldType, newValue, state.selectedAdjacentFields);
+    updateState({ journals });
   };
 
   const toggleAdjacentField = (field: JournalField) => {
@@ -632,14 +664,8 @@ function StepSources({ state, updateState, nextStep, prevStep, discoverPapers }:
       includeAdjacentFields: updated.length > 0
     });
     
-    // Add/remove adjacent journals
-    if (updated.includes(field)) {
-      const adjacentJournals = getJournalsByTier(field, [1, 2]);
-      updateState({ journals: [...state.journals, ...adjacentJournals] });
-    } else {
-      const toRemove = new Set(getJournalsByTier(field, [1, 2, 3]));
-      updateState({ journals: state.journals.filter(j => !toRemove.has(j)) });
-    }
+    const journals = buildJournalList(state.fieldType, state.includeWorkingPapers, updated);
+    updateState({ journals });
   };
 
   const handleDiscover = () => {
@@ -648,6 +674,17 @@ function StepSources({ state, updateState, nextStep, prevStep, discoverPapers }:
     // Then start fetching (async, will update state when done)
     discoverPapers();
   };
+  
+  // Initialize journals on first render if empty
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (state.journals.length === 0) {
+      const journals = buildJournalList(state.fieldType, state.includeWorkingPapers, state.selectedAdjacentFields);
+      updateState({ journals });
+    }
+  }, []);
+
+  const workingPaperCount = getWorkingPapers().length;
 
   return (
     <div className="animate-fade-in">
@@ -660,10 +697,32 @@ function StepSources({ state, updateState, nextStep, prevStep, discoverPapers }:
         Choose journals, time range, and optional related fields.
       </p>
 
+      {/* Working Papers Toggle */}
+      <div className="mt-6">
+        <label className="flex items-center gap-3 rounded-lg border-2 border-amber-200 bg-amber-50 p-3 cursor-pointer hover:border-amber-300 transition-colors">
+          <input
+            type="checkbox"
+            checked={state.includeWorkingPapers}
+            onChange={toggleWorkingPapers}
+            className="h-4 w-4 rounded border-amber-400 text-amber-600 focus:ring-amber-500"
+          />
+          <div className="flex-1">
+            <span className="font-medium text-amber-900">Working Papers</span>
+            <span className="ml-2 text-xs text-amber-700">(NBER, CEPR)</span>
+          </div>
+          <span className="text-xs text-amber-600 bg-amber-100 px-2 py-0.5 rounded">
+            Cutting-edge
+          </span>
+        </label>
+        <p className="mt-1 text-xs text-paper-500">
+          Pre-publication research from top economists. Often 6-18 months ahead of journal publication.
+        </p>
+      </div>
+
       {/* Field Selection */}
       <div className="mt-6">
         <p className="mb-2 text-xs font-medium uppercase tracking-wider text-paper-400">
-          Core Fields
+          Published Journals
         </p>
         <div className="flex gap-2">
           {(["Economics", "Political Science", "Both"] as const).map((type) => (
@@ -703,7 +762,7 @@ function StepSources({ state, updateState, nextStep, prevStep, discoverPapers }:
                 />
                 <span className="text-sm capitalize">{field}</span>
                 <span className="text-xs text-paper-400">
-                  ({journalOptions[field].tier1.length + journalOptions[field].tier2.length} journals)
+                  ({journalOptions[field as keyof typeof journalOptions]?.tier1.length + journalOptions[field as keyof typeof journalOptions]?.tier2.length} journals)
                 </span>
               </label>
             ))}
@@ -737,9 +796,12 @@ function StepSources({ state, updateState, nextStep, prevStep, discoverPapers }:
       {/* Journal Count Summary */}
       <div className="mt-4 rounded-lg bg-paper-100 p-3 text-sm text-paper-600">
         <Search className="mr-2 inline h-4 w-4" />
-        Searching {state.journals.length} journals
+        Searching {state.journals.length} sources
+        {state.includeWorkingPapers && (
+          <span className="text-amber-700"> (incl. working papers)</span>
+        )}
         {state.selectedAdjacentFields.length > 0 && (
-          <span> (including {state.selectedAdjacentFields.length} related fields)</span>
+          <span> + {state.selectedAdjacentFields.length} related fields</span>
         )}
       </div>
 

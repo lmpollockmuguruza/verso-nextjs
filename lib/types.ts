@@ -7,7 +7,8 @@ export type JournalField =
   | "polisci" 
   | "psychology" 
   | "sociology" 
-  | "management";
+  | "management"
+  | "working_papers";  // NBER, CEPR, etc.
 
 export interface Journal {
   name: string;
