@@ -98,7 +98,7 @@ export function FunLoading({ userName }: FunLoadingProps) {
         setQuipIndex((prev) => (prev + 1) % LOADING_QUIPS.length);
         setFade(true);
       }, 300);
-    }, 3500);
+    }, 10000);  // Change phrase every 10 seconds (user sees 1, maybe 2)
 
     return () => clearInterval(interval);
   }, []);

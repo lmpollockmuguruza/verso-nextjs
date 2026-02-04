@@ -19,17 +19,31 @@ import type { Journal, JournalOptions, JournalField } from "./types";
 
 export const ECONOMICS_JOURNALS: Record<string, Journal> = {
   // Working Paper Series (Pre-prints / Cutting Edge)
+  // NBER Working Papers - uses ISSN 0898-2937
   "NBER Working Papers": {
     name: "NBER Working Papers",
     issn: "0898-2937",
     field: "economics",
     tier: 1,
+    altNames: [
+      "National Bureau of Economic Research", 
+      "NBER Working Paper Series", 
+      "NBER working paper",
+      "NBER",
+    ],
   },
+  // CEPR Discussion Papers - search for name variations
   "CEPR Discussion Papers": {
     name: "CEPR Discussion Papers",
-    openAlexId: "S4210174296",
+    issn: "0800-2785", // CEPR DP ISSN
     field: "economics",
     tier: 1,
+    altNames: [
+      "Centre for Economic Policy Research",
+      "CEPR Discussion Paper",
+      "CEPR DP",
+      "CEPR",
+    ],
   },
   // Tier 1 - Top 5
   "American Economic Review": {
@@ -746,10 +760,47 @@ export function getJournalsByTier(
     .map(([name]) => name);
 }
 
+// Cache for alt name lookups
+let altNameCache: Map<string, Journal> | null = null;
+
+function buildAltNameCache(): Map<string, Journal> {
+  const cache = new Map<string, Journal>();
+  for (const [name, journal] of Object.entries(ALL_JOURNALS)) {
+    // Add primary name (lowercase for case-insensitive matching)
+    cache.set(name.toLowerCase(), journal);
+    // Add alternate names
+    if (journal.altNames) {
+      for (const altName of journal.altNames) {
+        cache.set(altName.toLowerCase(), journal);
+      }
+    }
+  }
+  return cache;
+}
+
+/**
+ * Look up a journal by name, including alternate names.
+ * Case-insensitive matching.
+ */
+export function findJournalByName(name: string): Journal | undefined {
+  // Direct lookup first (fast path)
+  if (ALL_JOURNALS[name]) {
+    return ALL_JOURNALS[name];
+  }
+  
+  // Build cache if needed
+  if (!altNameCache) {
+    altNameCache = buildAltNameCache();
+  }
+  
+  // Look up by lowercase name
+  return altNameCache.get(name.toLowerCase());
+}
+
 export function getJournalInfo(journalName: string): Journal | undefined {
-  return ALL_JOURNALS[journalName];
+  return findJournalByName(journalName);
 }
 
 export function getJournalField(journalName: string): JournalField | undefined {
-  return ALL_JOURNALS[journalName]?.field;
+  return findJournalByName(journalName)?.field;
 }

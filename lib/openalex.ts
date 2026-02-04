@@ -5,7 +5,7 @@
  */
 
 import type { OpenAlexResponse, OpenAlexWork, Paper } from "./types";
-import { ALL_JOURNALS } from "./journals";
+import { ALL_JOURNALS, findJournalByName } from "./journals";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
@@ -183,8 +183,8 @@ export function processPaper(work: OpenAlexWork): Paper | null {
     ? `https://doi.org/${doi.replace("https://doi.org/", "")}`
     : undefined;
 
-  // Journal info
-  const journal = ALL_JOURNALS[journalName];
+  // Journal info - use findJournalByName to handle alternate names
+  const journal = findJournalByName(journalName);
   const journalTier = journal?.tier || 4;
   const journalField = journal?.field;
 
@@ -243,8 +243,9 @@ export async function fetchRecentPapers(
   const toDate = endDate.toISOString().split("T")[0];
 
   // Get ISSNs and OpenAlex source IDs for selected journals
-  let issns: string[] = [];
-  let sourceIds: string[] = [];
+  // Prioritize OpenAlex IDs when available (more reliable for working papers)
+  const issns: string[] = [];
+  const sourceIds: string[] = [];
   
   const journalsToQuery = selectedJournals && selectedJournals.length > 0
     ? selectedJournals.filter((j) => ALL_JOURNALS[j])
@@ -252,35 +253,32 @@ export async function fetchRecentPapers(
     
   for (const journalName of journalsToQuery) {
     const journal = ALL_JOURNALS[journalName];
-    if (journal?.issn) {
-      issns.push(journal.issn);
-    }
-    if (journal?.openAlexId) {
+    if (!journal) continue;
+    
+    // Prefer OpenAlex ID if available (more reliable for working papers)
+    if (journal.openAlexId) {
       sourceIds.push(journal.openAlexId);
+    } else if (journal.issn) {
+      // Only use ISSN if no OpenAlex ID
+      issns.push(journal.issn);
     }
   }
 
   if (!issns.length && !sourceIds.length) return [];
 
-  // Build filter - combine ISSN filter and source ID filter with OR
-  const filterParts: string[] = [];
-  filterParts.push(`from_publication_date:${fromDate}`);
-  filterParts.push(`to_publication_date:${toDate}`);
-  
-  // For sources, we need to use a combined filter
-  // OpenAlex allows: primary_location.source.issn:X|Y|Z OR primary_location.source.id:A|B|C
+  // Build source filters
   const sourceFilters: string[] = [];
-  if (issns.length > 0) {
-    sourceFilters.push(`primary_location.source.issn:${issns.join("|")}`);
-  }
   if (sourceIds.length > 0) {
     sourceFilters.push(`primary_location.source.id:${sourceIds.join("|")}`);
   }
+  if (issns.length > 0) {
+    sourceFilters.push(`primary_location.source.issn:${issns.join("|")}`);
+  }
   
   const papers: Paper[] = [];
+  const seenIds = new Set<string>();  // Avoid duplicates
   
-  // If we have both ISSNs and source IDs, we need to make separate queries
-  // because OpenAlex doesn't support OR across different filter fields easily
+  // Query each source filter
   for (const sourceFilter of sourceFilters) {
     let cursor = "*";
     
@@ -300,7 +298,8 @@ export async function fetchRecentPapers(
 
       for (const work of results) {
         const processed = processPaper(work);
-        if (processed) {
+        if (processed && !seenIds.has(processed.id)) {
+          seenIds.add(processed.id);
           papers.push(processed);
           if (papers.length >= maxResults) break;
         }

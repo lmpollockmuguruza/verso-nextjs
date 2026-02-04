@@ -15,6 +15,7 @@ export interface Journal {
   openAlexId?: string;  // OpenAlex source ID for sources without ISSN
   field: JournalField;
   tier: 1 | 2 | 3;
+  altNames?: string[];  // Alternate names that OpenAlex might use
 }
 
 export interface Concept {
