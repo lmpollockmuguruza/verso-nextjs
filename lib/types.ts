@@ -2,10 +2,17 @@
 // CORE TYPES
 // ═══════════════════════════════════════════════════════════════════════════
 
+export type JournalField = 
+  | "economics" 
+  | "polisci" 
+  | "psychology" 
+  | "sociology" 
+  | "management";
+
 export interface Journal {
   name: string;
   issn: string;
-  field: "economics" | "polisci";
+  field: JournalField;
   tier: 1 | 2 | 3;
 }
 
@@ -24,6 +31,7 @@ export interface Paper {
   abstract: string;
   journal: string;
   journal_tier: number;
+  journal_field?: JournalField;
   publication_date: string;
   concepts: Concept[];
   cited_by_count: number;
@@ -35,20 +43,29 @@ export interface ScoredPaper extends Paper {
   relevance_score: number;
   matched_interests: string[];
   matched_methods: string[];
+  matched_topics: string[];
   match_explanation: string;
+  is_adjacent_field?: boolean;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // USER PROFILE
 // ═══════════════════════════════════════════════════════════════════════════
 
+export type ApproachPreference = "quantitative" | "qualitative" | "both" | "no_preference";
+export type ExperienceType = "specialist" | "generalist" | "explorer";
+
 export interface UserProfile {
   name: string;
   academic_level: string;
   primary_field: string;
-  interests: string[];
-  methods: string[];
+  interests: string[];           // Now optional (can be empty)
+  methods: string[];             // Now optional (can be empty)
   region: string;
+  approach_preference: ApproachPreference;
+  experience_type: ExperienceType;
+  include_adjacent_fields: boolean;
+  selected_adjacent_fields: JournalField[];
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -89,14 +106,32 @@ export interface JournalOptions {
     tier2: string[];
     tier3: string[];
   };
+  psychology: {
+    tier1: string[];
+    tier2: string[];
+    tier3: string[];
+  };
+  sociology: {
+    tier1: string[];
+    tier2: string[];
+    tier3: string[];
+  };
+  management: {
+    tier1: string[];
+    tier2: string[];
+    tier3: string[];
+  };
 }
 
 export interface ProfileOptions {
   academic_levels: string[];
   primary_fields: string[];
   interests: string[];
-  methods: string[];
+  quantitative_methods: string[];
+  qualitative_methods: string[];
+  mixed_methods: string[];
   regions: string[];
+  approach_preferences: { value: ApproachPreference; label: string }[];
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -111,13 +146,17 @@ export interface KeywordEntry {
 
 export interface MatchScore {
   total: number;
+  baseline_score: number;
   concept_score: number;
   keyword_score: number;
   method_score: number;
   quality_score: number;
+  field_relevance_score: number;
   matched_interests: string[];
   matched_methods: string[];
+  matched_topics: string[];
   explanation: string;
+  is_adjacent_field: boolean;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -166,4 +205,18 @@ export interface OpenAlexResponse {
     count?: number;
     next_cursor?: string;
   };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GROUPED OPTIONS (for UI)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface OptionGroup {
+  label: string;
+  options: string[];
+}
+
+export interface GroupedOptions {
+  groups: OptionGroup[];
+  all: string[];
 }

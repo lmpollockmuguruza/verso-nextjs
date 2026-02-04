@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Check, ChevronDown, X, Search } from "lucide-react";
+import type { OptionGroup } from "@/lib/types";
 
 interface MultiSelectProps {
   options: string[];
@@ -10,7 +11,7 @@ interface MultiSelectProps {
   placeholder?: string;
   maxSelections?: number;
   searchable?: boolean;
-  grouped?: Record<string, string[]>;
+  groups?: OptionGroup[];
 }
 
 export function MultiSelect({
@@ -20,7 +21,7 @@ export function MultiSelect({
   placeholder = "Select options...",
   maxSelections,
   searchable = true,
-  grouped,
+  groups,
 }: MultiSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -57,21 +58,21 @@ export function MultiSelect({
     : options;
 
   // Get grouped filtered options if provided
-  const getGroupedOptions = () => {
-    if (!grouped) return null;
-    const result: Record<string, string[]> = {};
-    for (const [group, groupOptions] of Object.entries(grouped)) {
-      const filtered = groupOptions.filter((opt) =>
+  const getGroupedOptions = (): OptionGroup[] | null => {
+    if (!groups) return null;
+    const result: OptionGroup[] = [];
+    for (const group of groups) {
+      const filtered = group.options.filter((opt) =>
         search ? opt.toLowerCase().includes(search.toLowerCase()) : true
       );
       if (filtered.length > 0) {
-        result[group] = filtered;
+        result.push({ label: group.label, options: filtered });
       }
     }
-    return result;
+    return result.length > 0 ? result : null;
   };
 
-  const groupedFiltered = grouped ? getGroupedOptions() : null;
+  const groupedFiltered = groups ? getGroupedOptions() : null;
 
   const toggleOption = (option: string) => {
     if (selected.includes(option)) {
@@ -172,12 +173,12 @@ export function MultiSelect({
           <div className="max-h-52 overflow-y-auto p-1">
             {groupedFiltered
               ? // Grouped options
-                Object.entries(groupedFiltered).map(([group, groupOptions]) => (
-                  <div key={group} className="mb-2">
+                groupedFiltered.map((group) => (
+                  <div key={group.label} className="mb-2">
                     <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-paper-400">
-                      {group}
+                      {group.label}
                     </div>
-                    {groupOptions.map((option) => (
+                    {group.options.map((option) => (
                       <button
                         key={option}
                         type="button"

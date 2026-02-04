@@ -1,11 +1,17 @@
 /**
  * Journal Definitions for Econvery
  * ═══════════════════════════════════════════════════════════════════════════
- * Economics and Political Science journals organized by tier.
- * Tier 1 = Top journals, Tier 2 = Top field, Tier 3 = Excellent
+ * 
+ * Organized by field and tier:
+ * - Core Fields: Economics, Political Science
+ * - Adjacent Fields: Psychology, Sociology, Management
+ * 
+ * Tier 1 = Flagship journals (highest prestige)
+ * Tier 2 = Top field journals
+ * Tier 3 = Excellent journals
  */
 
-import type { Journal, JournalOptions } from "./types";
+import type { Journal, JournalOptions, JournalField } from "./types";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ECONOMICS JOURNALS
@@ -183,6 +189,12 @@ export const ECONOMICS_JOURNALS: Record<string, Journal> = {
     field: "economics",
     tier: 3,
   },
+  "American Economic Journal: Insights": {
+    name: "American Economic Journal: Insights",
+    issn: "2640-205X",
+    field: "economics",
+    tier: 3,
+  },
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -327,15 +339,311 @@ export const POLISCI_JOURNALS: Record<string, Journal> = {
   },
 };
 
-// Combined journals
-export const ALL_JOURNALS: Record<string, Journal> = {
+// ═══════════════════════════════════════════════════════════════════════════
+// PSYCHOLOGY JOURNALS (Adjacent Field)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export const PSYCHOLOGY_JOURNALS: Record<string, Journal> = {
+  // Tier 1 - Flagship
+  "Psychological Science": {
+    name: "Psychological Science",
+    issn: "0956-7976",
+    field: "psychology",
+    tier: 1,
+  },
+  "Journal of Personality and Social Psychology": {
+    name: "Journal of Personality and Social Psychology",
+    issn: "0022-3514",
+    field: "psychology",
+    tier: 1,
+  },
+  "Psychological Bulletin": {
+    name: "Psychological Bulletin",
+    issn: "0033-2909",
+    field: "psychology",
+    tier: 1,
+  },
+  // Tier 2 - Top Field
+  "Journal of Experimental Psychology: General": {
+    name: "Journal of Experimental Psychology: General",
+    issn: "0096-3445",
+    field: "psychology",
+    tier: 2,
+  },
+  "Psychological Review": {
+    name: "Psychological Review",
+    issn: "0033-295X",
+    field: "psychology",
+    tier: 2,
+  },
+  "Annual Review of Psychology": {
+    name: "Annual Review of Psychology",
+    issn: "0066-4308",
+    field: "psychology",
+    tier: 2,
+  },
+  "Perspectives on Psychological Science": {
+    name: "Perspectives on Psychological Science",
+    issn: "1745-6916",
+    field: "psychology",
+    tier: 2,
+  },
+  "Cognition": {
+    name: "Cognition",
+    issn: "0010-0277",
+    field: "psychology",
+    tier: 2,
+  },
+  "Journal of Applied Psychology": {
+    name: "Journal of Applied Psychology",
+    issn: "0021-9010",
+    field: "psychology",
+    tier: 2,
+  },
+  // Tier 3 - Excellent
+  "Psychological Methods": {
+    name: "Psychological Methods",
+    issn: "1082-989X",
+    field: "psychology",
+    tier: 3,
+  },
+  "Journal of Consumer Psychology": {
+    name: "Journal of Consumer Psychology",
+    issn: "1057-7408",
+    field: "psychology",
+    tier: 3,
+  },
+  "Organizational Behavior and Human Decision Processes": {
+    name: "Organizational Behavior and Human Decision Processes",
+    issn: "0749-5978",
+    field: "psychology",
+    tier: 3,
+  },
+  "Social Psychological and Personality Science": {
+    name: "Social Psychological and Personality Science",
+    issn: "1948-5506",
+    field: "psychology",
+    tier: 3,
+  },
+  "Judgment and Decision Making": {
+    name: "Judgment and Decision Making",
+    issn: "1930-2975",
+    field: "psychology",
+    tier: 3,
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SOCIOLOGY JOURNALS (Adjacent Field)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export const SOCIOLOGY_JOURNALS: Record<string, Journal> = {
+  // Tier 1 - Flagship
+  "American Sociological Review": {
+    name: "American Sociological Review",
+    issn: "0003-1224",
+    field: "sociology",
+    tier: 1,
+  },
+  "American Journal of Sociology": {
+    name: "American Journal of Sociology",
+    issn: "0002-9602",
+    field: "sociology",
+    tier: 1,
+  },
+  // Tier 2 - Top Field
+  "Annual Review of Sociology": {
+    name: "Annual Review of Sociology",
+    issn: "0360-0572",
+    field: "sociology",
+    tier: 2,
+  },
+  "Social Forces": {
+    name: "Social Forces",
+    issn: "0037-7732",
+    field: "sociology",
+    tier: 2,
+  },
+  "Demography": {
+    name: "Demography",
+    issn: "0070-3370",
+    field: "sociology",
+    tier: 2,
+  },
+  "Sociological Methods & Research": {
+    name: "Sociological Methods & Research",
+    issn: "0049-1241",
+    field: "sociology",
+    tier: 2,
+  },
+  "Social Networks": {
+    name: "Social Networks",
+    issn: "0378-8733",
+    field: "sociology",
+    tier: 2,
+  },
+  // Tier 3 - Excellent
+  "Sociology of Education": {
+    name: "Sociology of Education",
+    issn: "0038-0407",
+    field: "sociology",
+    tier: 3,
+  },
+  "Journal of Health and Social Behavior": {
+    name: "Journal of Health and Social Behavior",
+    issn: "0022-1465",
+    field: "sociology",
+    tier: 3,
+  },
+  "Social Problems": {
+    name: "Social Problems",
+    issn: "0037-7791",
+    field: "sociology",
+    tier: 3,
+  },
+  "Work and Occupations": {
+    name: "Work and Occupations",
+    issn: "0730-8884",
+    field: "sociology",
+    tier: 3,
+  },
+  "European Sociological Review": {
+    name: "European Sociological Review",
+    issn: "0266-7215",
+    field: "sociology",
+    tier: 3,
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MANAGEMENT JOURNALS (Adjacent Field)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export const MANAGEMENT_JOURNALS: Record<string, Journal> = {
+  // Tier 1 - Flagship
+  "Academy of Management Journal": {
+    name: "Academy of Management Journal",
+    issn: "0001-4273",
+    field: "management",
+    tier: 1,
+  },
+  "Academy of Management Review": {
+    name: "Academy of Management Review",
+    issn: "0363-7425",
+    field: "management",
+    tier: 1,
+  },
+  "Administrative Science Quarterly": {
+    name: "Administrative Science Quarterly",
+    issn: "0001-8392",
+    field: "management",
+    tier: 1,
+  },
+  // Tier 2 - Top Field
+  "Strategic Management Journal": {
+    name: "Strategic Management Journal",
+    issn: "0143-2095",
+    field: "management",
+    tier: 2,
+  },
+  "Organization Science": {
+    name: "Organization Science",
+    issn: "1047-7039",
+    field: "management",
+    tier: 2,
+  },
+  "Management Science": {
+    name: "Management Science",
+    issn: "0025-1909",
+    field: "management",
+    tier: 2,
+  },
+  "Journal of Management": {
+    name: "Journal of Management",
+    issn: "0149-2063",
+    field: "management",
+    tier: 2,
+  },
+  "Journal of International Business Studies": {
+    name: "Journal of International Business Studies",
+    issn: "0047-2506",
+    field: "management",
+    tier: 2,
+  },
+  // Tier 3 - Excellent
+  "Organization Studies": {
+    name: "Organization Studies",
+    issn: "0170-8406",
+    field: "management",
+    tier: 3,
+  },
+  "Journal of Management Studies": {
+    name: "Journal of Management Studies",
+    issn: "0022-2380",
+    field: "management",
+    tier: 3,
+  },
+  "Journal of Business Ethics": {
+    name: "Journal of Business Ethics",
+    issn: "0167-4544",
+    field: "management",
+    tier: 3,
+  },
+  "Academy of Management Perspectives": {
+    name: "Academy of Management Perspectives",
+    issn: "1558-9080",
+    field: "management",
+    tier: 3,
+  },
+  "Academy of Management Annals": {
+    name: "Academy of Management Annals",
+    issn: "1941-6520",
+    field: "management",
+    tier: 3,
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COMBINED JOURNAL MAPS
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Core fields only
+export const CORE_JOURNALS: Record<string, Journal> = {
   ...ECONOMICS_JOURNALS,
   ...POLISCI_JOURNALS,
+};
+
+// Adjacent fields only
+export const ADJACENT_JOURNALS: Record<string, Journal> = {
+  ...PSYCHOLOGY_JOURNALS,
+  ...SOCIOLOGY_JOURNALS,
+  ...MANAGEMENT_JOURNALS,
+};
+
+// All journals
+export const ALL_JOURNALS: Record<string, Journal> = {
+  ...CORE_JOURNALS,
+  ...ADJACENT_JOURNALS,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
 // HELPER FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════
+
+export function getJournalsByField(field: JournalField): Record<string, Journal> {
+  switch (field) {
+    case "economics":
+      return ECONOMICS_JOURNALS;
+    case "polisci":
+      return POLISCI_JOURNALS;
+    case "psychology":
+      return PSYCHOLOGY_JOURNALS;
+    case "sociology":
+      return SOCIOLOGY_JOURNALS;
+    case "management":
+      return MANAGEMENT_JOURNALS;
+  }
+}
 
 export function getEconomicsJournals(): string[] {
   return Object.keys(ECONOMICS_JOURNALS);
@@ -345,52 +653,90 @@ export function getPolisciJournals(): string[] {
   return Object.keys(POLISCI_JOURNALS);
 }
 
+export function getPsychologyJournals(): string[] {
+  return Object.keys(PSYCHOLOGY_JOURNALS);
+}
+
+export function getSociologyJournals(): string[] {
+  return Object.keys(SOCIOLOGY_JOURNALS);
+}
+
+export function getManagementJournals(): string[] {
+  return Object.keys(MANAGEMENT_JOURNALS);
+}
+
+export function getCoreJournals(): string[] {
+  return Object.keys(CORE_JOURNALS);
+}
+
+export function getAdjacentJournals(): string[] {
+  return Object.keys(ADJACENT_JOURNALS);
+}
+
 export function getAllJournals(): string[] {
   return Object.keys(ALL_JOURNALS);
 }
 
+export function isAdjacentField(field: JournalField): boolean {
+  return ["psychology", "sociology", "management"].includes(field);
+}
+
 export function getJournalOptions(): JournalOptions {
+  const buildTierOptions = (journals: Record<string, Journal>) => ({
+    tier1: Object.entries(journals)
+      .filter(([, j]) => j.tier === 1)
+      .map(([name]) => name),
+    tier2: Object.entries(journals)
+      .filter(([, j]) => j.tier === 2)
+      .map(([name]) => name),
+    tier3: Object.entries(journals)
+      .filter(([, j]) => j.tier === 3)
+      .map(([name]) => name),
+  });
+
   return {
-    economics: {
-      tier1: Object.entries(ECONOMICS_JOURNALS)
-        .filter(([, j]) => j.tier === 1)
-        .map(([name]) => name),
-      tier2: Object.entries(ECONOMICS_JOURNALS)
-        .filter(([, j]) => j.tier === 2)
-        .map(([name]) => name),
-      tier3: Object.entries(ECONOMICS_JOURNALS)
-        .filter(([, j]) => j.tier === 3)
-        .map(([name]) => name),
-    },
-    polisci: {
-      tier1: Object.entries(POLISCI_JOURNALS)
-        .filter(([, j]) => j.tier === 1)
-        .map(([name]) => name),
-      tier2: Object.entries(POLISCI_JOURNALS)
-        .filter(([, j]) => j.tier === 2)
-        .map(([name]) => name),
-      tier3: Object.entries(POLISCI_JOURNALS)
-        .filter(([, j]) => j.tier === 3)
-        .map(([name]) => name),
-    },
+    economics: buildTierOptions(ECONOMICS_JOURNALS),
+    polisci: buildTierOptions(POLISCI_JOURNALS),
+    psychology: buildTierOptions(PSYCHOLOGY_JOURNALS),
+    sociology: buildTierOptions(SOCIOLOGY_JOURNALS),
+    management: buildTierOptions(MANAGEMENT_JOURNALS),
   };
 }
 
 export function getJournalsByTier(
-  field: "economics" | "polisci" | "both",
+  field: JournalField | "core" | "adjacent" | "all",
   tiers: number[]
 ): string[] {
   let journals: Record<string, Journal>;
 
-  if (field === "economics") {
-    journals = ECONOMICS_JOURNALS;
-  } else if (field === "polisci") {
-    journals = POLISCI_JOURNALS;
-  } else {
-    journals = ALL_JOURNALS;
+  switch (field) {
+    case "economics":
+    case "polisci":
+    case "psychology":
+    case "sociology":
+    case "management":
+      journals = getJournalsByField(field);
+      break;
+    case "core":
+      journals = CORE_JOURNALS;
+      break;
+    case "adjacent":
+      journals = ADJACENT_JOURNALS;
+      break;
+    case "all":
+    default:
+      journals = ALL_JOURNALS;
   }
 
   return Object.entries(journals)
     .filter(([, j]) => tiers.includes(j.tier))
     .map(([name]) => name);
+}
+
+export function getJournalInfo(journalName: string): Journal | undefined {
+  return ALL_JOURNALS[journalName];
+}
+
+export function getJournalField(journalName: string): JournalField | undefined {
+  return ALL_JOURNALS[journalName]?.field;
 }

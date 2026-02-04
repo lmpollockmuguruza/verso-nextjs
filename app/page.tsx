@@ -1,18 +1,41 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ArrowLeft, ArrowRight, Search, RotateCcw, Sparkles } from "lucide-react";
+import { 
+  ArrowLeft, 
+  ArrowRight, 
+  Search, 
+  RotateCcw, 
+  Sparkles,
+  SkipForward,
+  BookOpen,
+  FlaskConical,
+  Lightbulb,
+  Globe
+} from "lucide-react";
 import { ProgressDots, PaperCard, Loading, MultiSelect } from "@/components";
-import { getProfileOptions } from "@/lib/profile-options";
-import { getJournalOptions, getJournalsByTier } from "@/lib/journals";
-import type { ScoredPaper, UserProfile } from "@/lib/types";
+import { 
+  getProfileOptions, 
+  getGroupedOptions,
+  APPROACH_PREFERENCES,
+  isGeneralistField,
+  getMethodsByApproach
+} from "@/lib/profile-options";
+import { 
+  getJournalOptions, 
+  getCoreJournals,
+  getAdjacentJournals,
+  getJournalsByTier 
+} from "@/lib/journals";
+import type { ScoredPaper, UserProfile, ApproachPreference, JournalField } from "@/lib/types";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONSTANTS
 // ═══════════════════════════════════════════════════════════════════════════
 
-const TOTAL_STEPS = 7;
+const TOTAL_STEPS = 8;
 const profileOptions = getProfileOptions();
+const groupedOptions = getGroupedOptions();
 const journalOptions = getJournalOptions();
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -24,10 +47,13 @@ interface AppState {
   name: string;
   level: string;
   field: string;
+  approachPreference: ApproachPreference;
   interests: string[];
   methods: string[];
   region: string;
   fieldType: "Economics" | "Political Science" | "Both";
+  includeAdjacentFields: boolean;
+  selectedAdjacentFields: JournalField[];
   journals: string[];
   days: number;
   papers: ScoredPaper[];
@@ -39,12 +65,15 @@ interface AppState {
 const initialState: AppState = {
   step: 1,
   name: "",
-  level: "PhD Student",
-  field: "Labor Economics",
+  level: "Curious Learner",
+  field: "General Interest (Show me everything)",
+  approachPreference: "no_preference",
   interests: [],
   methods: [],
-  region: "United States",
+  region: "Global / No Preference",
   fieldType: "Both",
+  includeAdjacentFields: false,
+  selectedAdjacentFields: [],
   journals: [],
   days: 30,
   papers: [],
@@ -60,14 +89,13 @@ const initialState: AppState = {
 export default function Home() {
   const [state, setState] = useState<AppState>(initialState);
 
-  // Load saved state from localStorage on mount
+  // Load saved state from localStorage
   useEffect(() => {
     const saved = localStorage.getItem("econvery-state");
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        // Only restore if not on results page
-        if (parsed.step < 7) {
+        if (parsed.step < TOTAL_STEPS) {
           setState((s) => ({ ...s, ...parsed, papers: [], summary: "" }));
         }
       } catch (e) {
@@ -76,7 +104,7 @@ export default function Home() {
     }
   }, []);
 
-  // Save state to localStorage on changes
+  // Save state to localStorage
   useEffect(() => {
     const toSave = { ...state, papers: [], summary: "", isLoading: false, error: null };
     localStorage.setItem("econvery-state", JSON.stringify(toSave));
@@ -94,40 +122,20 @@ export default function Home() {
     setState((s) => ({ ...s, step: Math.max(s.step - 1, 1) }));
   }, []);
 
+  const goToStep = useCallback((step: number) => {
+    setState((s) => ({ ...s, step }));
+  }, []);
+
   const startOver = useCallback(() => {
     setState({ ...initialState });
     localStorage.removeItem("econvery-state");
   }, []);
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // API CALLS
-  // ═══════════════════════════════════════════════════════════════════════════
-
   const discoverPapers = useCallback(async () => {
     updateState({ isLoading: true, error: null });
 
     try {
-      // Step 1: Fetch papers from OpenAlex
-      const journalsParam = state.journals.map(encodeURIComponent).join(",");
-      const papersRes = await fetch(
-        `/api/papers?daysBack=${state.days}&maxResults=30&journals=${journalsParam}`
-      );
-
-      if (!papersRes.ok) {
-        throw new Error("Failed to fetch papers");
-      }
-
-      const papersData = await papersRes.json();
-
-      if (!papersData.papers?.length) {
-        updateState({
-          isLoading: false,
-          error: "No papers found. Try expanding your date range or journals.",
-        });
-        return;
-      }
-
-      // Step 2: Score and rank papers
+      // Build profile for API
       const profile: UserProfile = {
         name: state.name,
         academic_level: state.level,
@@ -135,8 +143,40 @@ export default function Home() {
         interests: state.interests,
         methods: state.methods,
         region: state.region,
+        approach_preference: state.approachPreference,
+        experience_type: isGeneralistField(state.field) ? "generalist" : "specialist",
+        include_adjacent_fields: state.includeAdjacentFields,
+        selected_adjacent_fields: state.selectedAdjacentFields,
       };
 
+      // Fetch papers
+      const journalParam = state.journals.length > 0 
+        ? state.journals.join(",") 
+        : getCoreJournals().join(",");
+        
+      const papersRes = await fetch(
+        `/api/papers?daysBack=${state.days}&maxResults=100&journals=${encodeURIComponent(journalParam)}`
+      );
+      
+      if (!papersRes.ok) {
+        throw new Error("Failed to fetch papers");
+      }
+
+      const papersData = await papersRes.json();
+
+      if (papersData.error) {
+        throw new Error(papersData.error);
+      }
+
+      if (!papersData.papers?.length) {
+        updateState({
+          isLoading: false,
+          error: "No papers found. Try expanding your date range or journal selection.",
+        });
+        return;
+      }
+
+      // Score papers
       const recommendRes = await fetch("/api/recommend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -144,7 +184,7 @@ export default function Home() {
       });
 
       if (!recommendRes.ok) {
-        throw new Error("Failed to score papers");
+        throw new Error("Failed to process papers");
       }
 
       const recommendData = await recommendRes.json();
@@ -154,50 +194,36 @@ export default function Home() {
         summary: recommendData.summary,
         isLoading: false,
       });
-    } catch (e) {
-      console.error("Discovery error:", e);
+    } catch (err) {
       updateState({
         isLoading: false,
-        error: e instanceof Error ? e.message : "Something went wrong",
+        error: err instanceof Error ? err.message : "Something went wrong",
       });
     }
-  }, [state.journals, state.days, state.name, state.level, state.field, state.interests, state.methods, state.region, updateState]);
+  }, [state, updateState]);
 
-  // Trigger discovery when reaching step 7
-  useEffect(() => {
-    if (state.step === 7 && state.papers.length === 0 && !state.isLoading) {
-      discoverPapers();
-    }
-  }, [state.step, state.papers.length, state.isLoading, discoverPapers]);
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // RENDER HELPERS
-  // ═══════════════════════════════════════════════════════════════════════════
-
+  // Render current step
   const renderStep = () => {
+    const stepProps = { state, updateState, nextStep, prevStep, goToStep, startOver, discoverPapers };
+    
     switch (state.step) {
-      case 1:
-        return <StepWelcome state={state} updateState={updateState} nextStep={nextStep} />;
-      case 2:
-        return <StepLevel state={state} updateState={updateState} nextStep={nextStep} prevStep={prevStep} />;
-      case 3:
-        return <StepField state={state} updateState={updateState} nextStep={nextStep} prevStep={prevStep} />;
-      case 4:
-        return <StepInterests state={state} updateState={updateState} nextStep={nextStep} prevStep={prevStep} />;
-      case 5:
-        return <StepMethods state={state} updateState={updateState} nextStep={nextStep} prevStep={prevStep} />;
-      case 6:
-        return <StepSources state={state} updateState={updateState} nextStep={nextStep} prevStep={prevStep} />;
-      case 7:
-        return <StepResults state={state} updateState={updateState} startOver={startOver} />;
-      default:
-        return null;
+      case 1: return <StepWelcome {...stepProps} />;
+      case 2: return <StepLevel {...stepProps} />;
+      case 3: return <StepField {...stepProps} />;
+      case 4: return <StepApproach {...stepProps} />;
+      case 5: return <StepInterests {...stepProps} />;
+      case 6: return <StepMethods {...stepProps} />;
+      case 7: return <StepSources {...stepProps} />;
+      case 8: return <StepResults {...stepProps} />;
+      default: return <StepWelcome {...stepProps} />;
     }
   };
 
   return (
-    <main className="mx-auto min-h-screen max-w-xl px-4 py-12">
-      {renderStep()}
+    <main className="min-h-screen bg-paper-50 px-4 py-12">
+      <div className="mx-auto max-w-lg">
+        {renderStep()}
+      </div>
     </main>
   );
 }
@@ -209,15 +235,20 @@ export default function Home() {
 interface StepProps {
   state: AppState;
   updateState: (updates: Partial<AppState>) => void;
-  nextStep?: () => void;
-  prevStep?: () => void;
-  startOver?: () => void;
+  nextStep: () => void;
+  prevStep: () => void;
+  goToStep: (step: number) => void;
+  startOver: () => void;
+  discoverPapers: () => Promise<void>;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP 1: WELCOME
+// ─────────────────────────────────────────────────────────────────────────────
 
 function StepWelcome({ state, updateState, nextStep }: StepProps) {
   return (
     <div className="animate-fade-in">
-      {/* Title */}
       <h1 className="text-center font-display text-display-lg font-light tracking-tight text-paper-900">
         Econvery
       </h1>
@@ -227,16 +258,15 @@ function StepWelcome({ state, updateState, nextStep }: StepProps) {
 
       <ProgressDots current={1} total={TOTAL_STEPS} />
 
-      {/* Form */}
       <div className="mt-8">
         <p className="text-xs font-medium uppercase tracking-widest text-paper-400">
-          Let's start
+          Let us start
         </p>
         <h2 className="mt-2 font-display text-display-sm font-normal text-paper-900">
-          What's your name?
+          What is your name?
         </h2>
         <p className="mt-1 text-paper-500">
-          We'll personalize your experience.
+          We will personalize your experience.
         </p>
 
         <input
@@ -261,6 +291,10 @@ function StepWelcome({ state, updateState, nextStep }: StepProps) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP 2: LEVEL (with generalist-friendly options)
+// ─────────────────────────────────────────────────────────────────────────────
+
 function StepLevel({ state, updateState, nextStep, prevStep }: StepProps) {
   return (
     <div className="animate-fade-in">
@@ -269,23 +303,36 @@ function StepLevel({ state, updateState, nextStep, prevStep }: StepProps) {
       <p className="text-lg text-paper-700">Nice to meet you, {state.name}.</p>
 
       <h2 className="mt-4 font-display text-display-sm font-normal text-paper-900">
-        What's your career stage?
+        What best describes you?
       </h2>
       <p className="mt-1 text-paper-500">
-        This helps us calibrate recommendations.
+        No academic background needed — curious minds welcome.
       </p>
 
-      <select
-        value={state.level}
-        onChange={(e) => updateState({ level: e.target.value })}
-        className="mt-6 w-full"
-      >
-        {profileOptions.academic_levels.map((level) => (
-          <option key={level} value={level}>
-            {level}
-          </option>
+      <div className="mt-6 space-y-2">
+        {groupedOptions.academic_levels.groups.map((group) => (
+          <div key={group.label} className="mb-4">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wider text-paper-400">
+              {group.label}
+            </p>
+            <div className="space-y-1">
+              {group.options.map((level) => (
+                <button
+                  key={level}
+                  onClick={() => updateState({ level })}
+                  className={`w-full rounded-lg border px-4 py-3 text-left text-sm transition-all ${
+                    state.level === level
+                      ? "border-paper-900 bg-paper-900 text-white"
+                      : "border-paper-200 bg-white text-paper-700 hover:border-paper-400"
+                  }`}
+                >
+                  {level}
+                </button>
+              ))}
+            </div>
+          </div>
         ))}
-      </select>
+      </div>
 
       <div className="mt-6 flex gap-3">
         <button onClick={prevStep} className="btn-secondary flex-1">
@@ -301,29 +348,56 @@ function StepLevel({ state, updateState, nextStep, prevStep }: StepProps) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP 3: FIELD (with generalist options first)
+// ─────────────────────────────────────────────────────────────────────────────
+
 function StepField({ state, updateState, nextStep, prevStep }: StepProps) {
+  const isGeneralist = isGeneralistField(state.field);
+  
   return (
     <div className="animate-fade-in">
       <ProgressDots current={3} total={TOTAL_STEPS} />
 
       <h2 className="font-display text-display-sm font-normal text-paper-900">
-        What's your primary field?
+        What interests you most?
       </h2>
       <p className="mt-1 text-paper-500">
-        Choose the area closest to your research.
+        Pick a focus area, or explore broadly.
       </p>
 
-      <select
-        value={state.field}
-        onChange={(e) => updateState({ field: e.target.value })}
-        className="mt-6 w-full"
-      >
-        {profileOptions.primary_fields.map((field) => (
-          <option key={field} value={field}>
-            {field}
-          </option>
+      <div className="mt-6 space-y-4">
+        {groupedOptions.primary_fields.groups.map((group) => (
+          <div key={group.label}>
+            <p className="mb-2 text-xs font-medium uppercase tracking-wider text-paper-400">
+              {group.label}
+            </p>
+            <div className="grid grid-cols-1 gap-2">
+              {group.options.map((field) => (
+                <button
+                  key={field}
+                  onClick={() => updateState({ field })}
+                  className={`rounded-lg border px-4 py-3 text-left text-sm transition-all ${
+                    state.field === field
+                      ? "border-paper-900 bg-paper-900 text-white"
+                      : "border-paper-200 bg-white text-paper-700 hover:border-paper-400"
+                  }`}
+                >
+                  {field}
+                </button>
+              ))}
+            </div>
+          </div>
         ))}
-      </select>
+      </div>
+
+      {isGeneralist && (
+        <div className="mt-4 rounded-lg bg-amber-50 p-4 text-sm text-amber-800">
+          <Lightbulb className="mb-1 inline h-4 w-4" />
+          {" "}Great choice! We will show you quality research from across disciplines.
+          You can still filter by topic if you want.
+        </div>
+      )}
 
       <div className="mt-6 flex gap-3">
         <button onClick={prevStep} className="btn-secondary flex-1">
@@ -339,167 +413,265 @@ function StepField({ state, updateState, nextStep, prevStep }: StepProps) {
   );
 }
 
-function StepInterests({ state, updateState, nextStep, prevStep }: StepProps) {
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP 4: APPROACH PREFERENCE (Quant/Qual/Both)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function StepApproach({ state, updateState, nextStep, prevStep }: StepProps) {
   return (
     <div className="animate-fade-in">
       <ProgressDots current={4} total={TOTAL_STEPS} />
 
       <h2 className="font-display text-display-sm font-normal text-paper-900">
-        What topics interest you?
+        What type of research?
       </h2>
       <p className="mt-1 text-paper-500">
-        Select up to 5, in order of priority. First picks matter more.
+        This helps us surface the right methodological approaches.
       </p>
+
+      <div className="mt-6 space-y-3">
+        {APPROACH_PREFERENCES.map((pref) => (
+          <button
+            key={pref.value}
+            onClick={() => updateState({ approachPreference: pref.value })}
+            className={`w-full rounded-lg border px-4 py-4 text-left transition-all ${
+              state.approachPreference === pref.value
+                ? "border-paper-900 bg-paper-900 text-white"
+                : "border-paper-200 bg-white text-paper-700 hover:border-paper-400"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              {pref.value === "quantitative" && <FlaskConical className="h-5 w-5" />}
+              {pref.value === "qualitative" && <BookOpen className="h-5 w-5" />}
+              {pref.value === "both" && <Sparkles className="h-5 w-5" />}
+              {pref.value === "no_preference" && <Globe className="h-5 w-5" />}
+              <div>
+                <div className="font-medium">{pref.label}</div>
+                <div className={`text-sm ${
+                  state.approachPreference === pref.value 
+                    ? "text-paper-300" 
+                    : "text-paper-500"
+                }`}>
+                  {pref.description}
+                </div>
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-6 flex gap-3">
+        <button onClick={prevStep} className="btn-secondary flex-1">
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </button>
+        <button onClick={nextStep} className="btn-primary flex-1">
+          Continue
+          <ArrowRight className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP 5: INTERESTS (Optional - can skip)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function StepInterests({ state, updateState, nextStep, prevStep }: StepProps) {
+  const isGeneralist = isGeneralistField(state.field);
+  
+  return (
+    <div className="animate-fade-in">
+      <ProgressDots current={5} total={TOTAL_STEPS} />
+
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="font-display text-display-sm font-normal text-paper-900">
+            Any specific topics?
+          </h2>
+          <p className="mt-1 text-paper-500">
+            Select up to 5 topics you care about — or skip to see everything.
+          </p>
+        </div>
+        <span className="rounded-full bg-paper-100 px-2 py-1 text-xs text-paper-500">
+          Optional
+        </span>
+      </div>
 
       <div className="mt-6">
         <MultiSelect
           options={profileOptions.interests}
           selected={state.interests}
           onChange={(interests) => updateState({ interests })}
-          placeholder="Select research interests..."
+          placeholder="Search topics..."
           maxSelections={5}
+          groups={groupedOptions.interests.groups}
         />
       </div>
+
+      {state.interests.length > 0 && (
+        <p className="mt-3 text-sm text-paper-500">
+          First selections are weighted more heavily in results.
+        </p>
+      )}
 
       <div className="mt-6 flex gap-3">
         <button onClick={prevStep} className="btn-secondary flex-1">
           <ArrowLeft className="h-4 w-4" />
           Back
         </button>
-        <button
-          onClick={nextStep}
-          disabled={state.interests.length === 0}
-          className="btn-primary flex-1"
-        >
-          Continue
-          <ArrowRight className="h-4 w-4" />
-        </button>
+        {state.interests.length === 0 ? (
+          <button onClick={nextStep} className="btn-secondary flex-1">
+            Skip for now
+            <SkipForward className="h-4 w-4" />
+          </button>
+        ) : (
+          <button onClick={nextStep} className="btn-primary flex-1">
+            Continue
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        )}
       </div>
+
+      {isGeneralist && state.interests.length === 0 && (
+        <p className="mt-4 text-center text-sm text-paper-400">
+          As a generalist, skipping is fine — you will see quality papers from across fields.
+        </p>
+      )}
     </div>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP 6: METHODS (Optional - can skip, filtered by approach)
+// ─────────────────────────────────────────────────────────────────────────────
 
 function StepMethods({ state, updateState, nextStep, prevStep }: StepProps) {
-  return (
-    <div className="animate-fade-in">
-      <ProgressDots current={5} total={TOTAL_STEPS} />
-
-      <h2 className="font-display text-display-sm font-normal text-paper-900">
-        Preferred methodologies?
-      </h2>
-      <p className="mt-1 text-paper-500">
-        Select up to 4 methods you care about most.
-      </p>
-
-      <div className="mt-6">
-        <MultiSelect
-          options={profileOptions.methods}
-          selected={state.methods}
-          onChange={(methods) => updateState({ methods })}
-          placeholder="Select methodologies..."
-          maxSelections={4}
-        />
-      </div>
-
-      <div className="mt-6 flex gap-3">
-        <button onClick={prevStep} className="btn-secondary flex-1">
-          <ArrowLeft className="h-4 w-4" />
-          Back
-        </button>
-        <button
-          onClick={nextStep}
-          disabled={state.methods.length === 0}
-          className="btn-primary flex-1"
-        >
-          Continue
-          <ArrowRight className="h-4 w-4" />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function StepSources({ state, updateState, nextStep, prevStep }: StepProps) {
-  const getAvailableJournals = () => {
-    if (state.fieldType === "Economics") {
-      return [...journalOptions.economics.tier1, ...journalOptions.economics.tier2, ...journalOptions.economics.tier3];
-    } else if (state.fieldType === "Political Science") {
-      return [...journalOptions.polisci.tier1, ...journalOptions.polisci.tier2, ...journalOptions.polisci.tier3];
-    }
-    return [
-      ...journalOptions.economics.tier1,
-      ...journalOptions.economics.tier2,
-      ...journalOptions.economics.tier3,
-      ...journalOptions.polisci.tier1,
-      ...journalOptions.polisci.tier2,
-      ...journalOptions.polisci.tier3,
-    ];
-  };
-
-  const selectTopJournals = () => {
-    if (state.fieldType === "Economics") {
-      updateState({ journals: journalOptions.economics.tier1 });
-    } else if (state.fieldType === "Political Science") {
-      updateState({ journals: journalOptions.polisci.tier1 });
-    } else {
-      updateState({
-        journals: [
-          ...journalOptions.economics.tier1.slice(0, 3),
-          ...journalOptions.polisci.tier1.slice(0, 2),
-        ],
-      });
-    }
-  };
-
-  const selectAllJournals = () => {
-    updateState({ journals: getAvailableJournals() });
-  };
-
-  const groupedJournals = {
-    "Top (Tier 1)":
-      state.fieldType === "Economics"
-        ? journalOptions.economics.tier1
-        : state.fieldType === "Political Science"
-          ? journalOptions.polisci.tier1
-          : [...journalOptions.economics.tier1, ...journalOptions.polisci.tier1],
-    "Top Field (Tier 2)":
-      state.fieldType === "Economics"
-        ? journalOptions.economics.tier2
-        : state.fieldType === "Political Science"
-          ? journalOptions.polisci.tier2
-          : [...journalOptions.economics.tier2, ...journalOptions.polisci.tier2],
-    "Excellent (Tier 3)":
-      state.fieldType === "Economics"
-        ? journalOptions.economics.tier3
-        : state.fieldType === "Political Science"
-          ? journalOptions.polisci.tier3
-          : [...journalOptions.economics.tier3, ...journalOptions.polisci.tier3],
-  };
-
+  const availableMethods = getMethodsByApproach(state.approachPreference);
+  
   return (
     <div className="animate-fade-in">
       <ProgressDots current={6} total={TOTAL_STEPS} />
 
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="font-display text-display-sm font-normal text-paper-900">
+            Preferred methodologies?
+          </h2>
+          <p className="mt-1 text-paper-500">
+            Select up to 4 methods — or skip if you are open to all.
+          </p>
+        </div>
+        <span className="rounded-full bg-paper-100 px-2 py-1 text-xs text-paper-500">
+          Optional
+        </span>
+      </div>
+
+      <div className="mt-6">
+        <MultiSelect
+          options={availableMethods}
+          selected={state.methods}
+          onChange={(methods) => updateState({ methods })}
+          placeholder="Search methods..."
+          maxSelections={4}
+          groups={groupedOptions.methods.groups}
+        />
+      </div>
+
+      <div className="mt-6 flex gap-3">
+        <button onClick={prevStep} className="btn-secondary flex-1">
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </button>
+        {state.methods.length === 0 ? (
+          <button onClick={nextStep} className="btn-secondary flex-1">
+            Skip for now
+            <SkipForward className="h-4 w-4" />
+          </button>
+        ) : (
+          <button onClick={nextStep} className="btn-primary flex-1">
+            Continue
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP 7: SOURCES (Journals, time range, adjacent fields)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function StepSources({ state, updateState, nextStep, prevStep, discoverPapers }: StepProps) {
+  const [showAdjacentOptions, setShowAdjacentOptions] = useState(state.includeAdjacentFields);
+  
+  const setFieldType = (type: "Economics" | "Political Science" | "Both") => {
+    updateState({ fieldType: type });
+    
+    // Auto-select tier 1 & 2 journals
+    let selected: string[] = [];
+    if (type === "Economics" || type === "Both") {
+      selected = [...selected, ...journalOptions.economics.tier1, ...journalOptions.economics.tier2];
+    }
+    if (type === "Political Science" || type === "Both") {
+      selected = [...selected, ...journalOptions.polisci.tier1, ...journalOptions.polisci.tier2];
+    }
+    updateState({ journals: selected });
+  };
+
+  const toggleAdjacentField = (field: JournalField) => {
+    const current = state.selectedAdjacentFields;
+    const updated = current.includes(field)
+      ? current.filter(f => f !== field)
+      : [...current, field];
+    
+    updateState({ 
+      selectedAdjacentFields: updated,
+      includeAdjacentFields: updated.length > 0
+    });
+    
+    // Add/remove adjacent journals
+    if (updated.includes(field)) {
+      const adjacentJournals = getJournalsByTier(field, [1, 2]);
+      updateState({ journals: [...state.journals, ...adjacentJournals] });
+    } else {
+      const toRemove = new Set(getJournalsByTier(field, [1, 2, 3]));
+      updateState({ journals: state.journals.filter(j => !toRemove.has(j)) });
+    }
+  };
+
+  const handleDiscover = async () => {
+    await discoverPapers();
+    nextStep();
+  };
+
+  return (
+    <div className="animate-fade-in">
+      <ProgressDots current={7} total={TOTAL_STEPS} />
+
       <h2 className="font-display text-display-sm font-normal text-paper-900">
-        Which journals?
+        Where to look?
       </h2>
       <p className="mt-1 text-paper-500">
-        Choose the journals and time range to search.
+        Choose journals, time range, and optional related fields.
       </p>
 
-      {/* Field type selector */}
+      {/* Field Selection */}
       <div className="mt-6">
-        <div className="flex rounded-lg border border-paper-200 p-1">
+        <p className="mb-2 text-xs font-medium uppercase tracking-wider text-paper-400">
+          Core Fields
+        </p>
+        <div className="flex gap-2">
           {(["Economics", "Political Science", "Both"] as const).map((type) => (
             <button
               key={type}
-              onClick={() => {
-                updateState({ fieldType: type, journals: [] });
-              }}
-              className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+              onClick={() => setFieldType(type)}
+              className={`flex-1 rounded-lg border px-3 py-2 text-sm transition-all ${
                 state.fieldType === type
-                  ? "bg-paper-900 text-white"
-                  : "text-paper-600 hover:text-paper-900"
+                  ? "border-paper-900 bg-paper-900 text-white"
+                  : "border-paper-200 bg-white text-paper-700 hover:border-paper-400"
               }`}
             >
               {type}
@@ -508,61 +680,65 @@ function StepSources({ state, updateState, nextStep, prevStep }: StepProps) {
         </div>
       </div>
 
-      {/* Quick select buttons */}
-      <div className="mt-4 flex gap-2">
-        <button onClick={selectTopJournals} className="btn-secondary flex-1 text-sm">
-          Top journals
-        </button>
-        <button onClick={selectAllJournals} className="btn-secondary flex-1 text-sm">
-          All journals
-        </button>
-      </div>
-
-      {/* Journal multiselect */}
-      <div className="mt-4">
-        <MultiSelect
-          options={getAvailableJournals()}
-          selected={state.journals}
-          onChange={(journals) => updateState({ journals })}
-          placeholder="Select journals..."
-          grouped={groupedJournals}
-        />
-      </div>
-
-      {/* Time range */}
+      {/* Adjacent Fields Toggle */}
       <div className="mt-6">
-        <label className="text-sm font-medium text-paper-700">
-          Time range: {state.days} days
-        </label>
+        <button
+          onClick={() => setShowAdjacentOptions(!showAdjacentOptions)}
+          className="text-sm text-paper-600 hover:text-paper-900"
+        >
+          {showAdjacentOptions ? "▼" : "▶"} Include related fields (Psychology, Sociology, Management)
+        </button>
+        
+        {showAdjacentOptions && (
+          <div className="mt-3 space-y-2">
+            {(["psychology", "sociology", "management"] as JournalField[]).map((field) => (
+              <label key={field} className="flex items-center gap-3 rounded-lg border border-paper-200 bg-white p-3">
+                <input
+                  type="checkbox"
+                  checked={state.selectedAdjacentFields.includes(field)}
+                  onChange={() => toggleAdjacentField(field)}
+                  className="h-4 w-4 rounded border-paper-300"
+                />
+                <span className="text-sm capitalize">{field}</span>
+                <span className="text-xs text-paper-400">
+                  ({journalOptions[field].tier1.length + journalOptions[field].tier2.length} journals)
+                </span>
+              </label>
+            ))}
+            <p className="text-xs text-paper-500">
+              Related field papers may score slightly lower but can still rank highly if very relevant.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Time Range */}
+      <div className="mt-6">
+        <p className="mb-2 text-xs font-medium uppercase tracking-wider text-paper-400">
+          Time Range
+        </p>
         <input
           type="range"
           min={7}
           max={90}
           step={7}
           value={state.days}
-          onChange={(e) => updateState({ days: parseInt(e.target.value, 10) })}
-          className="mt-2 w-full"
+          onChange={(e) => updateState({ days: parseInt(e.target.value) })}
+          className="w-full"
         />
-        <div className="mt-1 flex justify-between text-xs text-paper-400">
-          <span>7 days</span>
-          <span>90 days</span>
+        <div className="flex justify-between text-sm text-paper-500">
+          <span>Last {state.days} days</span>
+          <span>{state.days === 7 ? "1 week" : state.days === 30 ? "1 month" : `${Math.round(state.days / 7)} weeks`}</span>
         </div>
       </div>
 
-      {/* Region */}
-      <div className="mt-6">
-        <label className="text-sm font-medium text-paper-700">Region focus</label>
-        <select
-          value={state.region}
-          onChange={(e) => updateState({ region: e.target.value })}
-          className="mt-2 w-full"
-        >
-          {profileOptions.regions.map((region) => (
-            <option key={region} value={region}>
-              {region}
-            </option>
-          ))}
-        </select>
+      {/* Journal Count Summary */}
+      <div className="mt-4 rounded-lg bg-paper-100 p-3 text-sm text-paper-600">
+        <Search className="mr-2 inline h-4 w-4" />
+        Searching {state.journals.length} journals
+        {state.selectedAdjacentFields.length > 0 && (
+          <span> (including {state.selectedAdjacentFields.length} related fields)</span>
+        )}
       </div>
 
       <div className="mt-6 flex gap-3">
@@ -571,71 +747,91 @@ function StepSources({ state, updateState, nextStep, prevStep }: StepProps) {
           Back
         </button>
         <button
-          onClick={nextStep}
+          onClick={handleDiscover}
           disabled={state.journals.length === 0}
           className="btn-primary flex-1"
         >
-          <Search className="h-4 w-4" />
-          Find papers
+          <Sparkles className="h-4 w-4" />
+          Discover Papers
         </button>
       </div>
     </div>
   );
 }
 
-function StepResults({ state, updateState, startOver }: StepProps) {
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP 8: RESULTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+function StepResults({ state, updateState, startOver, discoverPapers, goToStep }: StepProps) {
   const [minScore, setMinScore] = useState(1.0);
 
+  // Handle loading state
   if (state.isLoading) {
     return (
-      <Loading
-        message={`Finding papers for you, ${state.name}...`}
-        subMessage="Searching top journals and scoring relevance"
-      />
+      <div className="animate-fade-in">
+        <Loading message={`Finding papers for you, ${state.name}...`} />
+      </div>
     );
   }
 
+  // Handle error state
   if (state.error) {
     return (
       <div className="animate-fade-in text-center">
-        <div className="rounded-xl bg-red-50 p-6">
-          <p className="text-red-700">{state.error}</p>
+        <p className="text-lg text-paper-700">{state.error}</p>
+        <div className="mt-6 flex gap-3">
+          <button onClick={() => goToStep(7)} className="btn-secondary flex-1">
+            <ArrowLeft className="h-4 w-4" />
+            Adjust Settings
+          </button>
+          <button onClick={() => discoverPapers()} className="btn-primary flex-1">
+            <RotateCcw className="h-4 w-4" />
+            Try Again
+          </button>
         </div>
-        <button onClick={startOver} className="btn-secondary mt-6">
-          <RotateCcw className="h-4 w-4" />
-          Start over
-        </button>
+      </div>
+    );
+  }
+
+  // Handle empty results
+  if (!state.papers.length) {
+    discoverPapers();
+    return (
+      <div className="animate-fade-in">
+        <Loading message={`Finding papers for you, ${state.name}...`} />
       </div>
     );
   }
 
   const filteredPapers = state.papers.filter((p) => p.relevance_score >= minScore);
-  const highRelevance = state.papers.filter((p) => p.relevance_score >= 7.0).length;
+  const highCount = state.papers.filter((p) => p.relevance_score >= 7.0).length;
+  const hasFilters = state.interests.length > 0 || state.methods.length > 0;
 
   return (
     <div className="animate-fade-in">
       {/* Header */}
-      <h1 className="text-center font-display text-display font-light tracking-tight text-paper-900">
+      <h1 className="text-center font-display text-display-lg font-light text-paper-900">
         For you, {state.name}
       </h1>
       <p className="mt-2 text-center text-paper-500">{state.summary}</p>
 
       {/* Stats */}
-      <div className="mt-8 grid grid-cols-2 gap-4">
-        <div className="rounded-xl bg-paper-100 p-5 text-center">
-          <div className="font-display text-4xl font-light text-paper-900">
+      <div className="mt-6 grid grid-cols-2 gap-4">
+        <div className="rounded-xl bg-paper-100 p-4 text-center">
+          <div className="font-display text-3xl font-light text-paper-900">
             {state.papers.length}
           </div>
-          <div className="mt-1 text-xs font-medium uppercase tracking-wider text-paper-500">
+          <div className="text-xs uppercase tracking-wider text-paper-500">
             Papers
           </div>
         </div>
-        <div className="rounded-xl bg-paper-100 p-5 text-center">
-          <div className="font-display text-4xl font-light text-paper-900">
-            {highRelevance}
+        <div className="rounded-xl bg-paper-100 p-4 text-center">
+          <div className="font-display text-3xl font-light text-paper-900">
+            {highCount}
           </div>
-          <div className="mt-1 text-xs font-medium uppercase tracking-wider text-paper-500">
-            Highly Relevant
+          <div className="text-xs uppercase tracking-wider text-paper-500">
+            {hasFilters ? "Highly Relevant" : "Top Quality"}
           </div>
         </div>
       </div>
