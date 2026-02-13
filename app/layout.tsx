@@ -25,7 +25,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#fafaf9",
+  themeColor: "#f5f2ec",
 };
 
 export default function RootLayout({
@@ -35,7 +35,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="min-h-screen">{children}</body>
+      <body className="min-h-screen">
+        {/* Ambient background orbs */}
+        <div className="ambient">
+          <div className="ambient-orb" />
+          <div className="ambient-orb" />
+        </div>
+        {children}
+      </body>
     </html>
   );
 }
