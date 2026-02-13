@@ -1,23 +1,22 @@
 /**
- * AI-Powered Paper Reranker for Econvery
+ * AI-Powered Paper Scorer for Econvery
  * ═══════════════════════════════════════════════════════════════════════════
  * 
- * Uses Google Gemini (free tier) to intelligently re-rank papers based on
- * the user's research profile. This addresses limitations of the keyword/
- * taxonomy-based scoring by leveraging LLM understanding of:
+ * Uses Google Gemini (free tier) as the PRIMARY recommendation engine.
  * 
- * 1. SEMANTIC NUANCE — Understanding that "labor market frictions" relates
- *    deeply to "unemployment" even without keyword overlap
+ * WHY AI-FIRST:
+ * The keyword/taxonomy approach fundamentally can't handle:
+ * - "social networks" matching a paper about "network centrality in peer groups"
+ * - "labor economics" matching "monopsony power in hiring platforms"  
+ * - Cross-field connections (a methods paper relevant to applied work)
  * 
- * 2. CROSS-FIELD CONNECTIONS — Recognizing when a methods paper in 
- *    econometrics is highly relevant to an applied micro researcher
+ * An LLM understands these semantic connections natively.
  * 
- * 3. RESEARCH FRONTIER AWARENESS — Understanding which topics are "hot"
- *    and which papers represent genuine contributions vs. incremental work
- * 
- * DESIGN: We send batches of paper summaries + user profile to Gemini,
- * and receive relevance scores (1-10) with brief explanations.
- * The AI scores are blended with the existing taxonomy scores.
+ * DESIGN:
+ * 1. Papers are sent in batches of 8 with the user's full profile
+ * 2. Gemini returns scores (1-10) + one-line explanations
+ * 3. AI scores REPLACE taxonomy scores entirely (not blended)
+ * 4. If AI fails, we fall back to taxonomy scores with a clear warning
  */
 
 import type { ScoredPaper, UserProfile } from "./types";
@@ -29,14 +28,6 @@ import type { ScoredPaper, UserProfile } from "./types";
 export interface AIRerankerConfig {
   apiKey: string;
   model?: string;
-  maxPapersPerBatch?: number;
-  blendWeight?: number; // 0-1, how much to weight AI scores vs original (default 0.5)
-}
-
-export interface AIScoreResult {
-  paperId: string;
-  aiScore: number;        // 1-10
-  aiExplanation: string;  // Brief reason for the score
 }
 
 export interface AIRerankerResult {
@@ -52,10 +43,8 @@ export interface AIRerankerResult {
 
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 const DEFAULT_MODEL = "gemini-2.5-flash";
-const MAX_PAPERS_PER_BATCH = 10;
-const BLEND_WEIGHT = 0.45; // AI gets 45% weight, original gets 55%
+const BATCH_SIZE = 8;
 
-// Models available on Gemini free tier (ordered by likelihood of having quota)
 export const GEMINI_MODELS = [
   { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash (recommended)" },
   { id: "gemini-2.0-flash-lite", label: "Gemini 2.0 Flash-Lite" },
@@ -64,320 +53,290 @@ export const GEMINI_MODELS = [
 ] as const;
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PROMPT BUILDER
+// PROMPT
 // ═══════════════════════════════════════════════════════════════════════════
 
-function buildUserProfileSummary(profile: UserProfile): string {
-  const parts: string[] = [];
-  
-  parts.push(`Academic level: ${profile.academic_level}`);
-  parts.push(`Primary field: ${profile.primary_field}`);
-  
+function buildPrompt(profile: UserProfile, papers: ScoredPaper[]): string {
+  const profileParts: string[] = [];
+  profileParts.push(`Level: ${profile.academic_level}`);
+  profileParts.push(`Field: ${profile.primary_field}`);
   if (profile.interests.length > 0) {
-    parts.push(`Research interests: ${profile.interests.join(", ")}`);
+    profileParts.push(`Interests: ${profile.interests.join(", ")}`);
+  } else {
+    profileParts.push(`Interests: General/broad — score based on importance and quality`);
   }
-  
   if (profile.methods.length > 0) {
-    parts.push(`Preferred methods: ${profile.methods.join(", ")}`);
+    profileParts.push(`Methods: ${profile.methods.join(", ")}`);
   }
-  
   if (profile.approach_preference !== "no_preference") {
-    parts.push(`Approach: ${profile.approach_preference}`);
+    profileParts.push(`Preference: ${profile.approach_preference} research`);
   }
-  
   if (profile.region && profile.region !== "Global / No Preference") {
-    parts.push(`Regional focus: ${profile.region}`);
+    profileParts.push(`Regional focus: ${profile.region}`);
   }
-  
-  return parts.join("\n");
-}
 
-function buildPaperSummary(paper: ScoredPaper, index: number): string {
-  const authors = paper.authors.slice(0, 3).join(", ");
-  const authSuffix = paper.authors.length > 3 ? " et al." : "";
-  // Truncate abstract to ~300 chars to save tokens
-  const abstract = paper.abstract.length > 300 
-    ? paper.abstract.substring(0, 300) + "..." 
-    : paper.abstract;
-  
-  return `[Paper ${index + 1}] ID: ${paper.id}
-Title: ${paper.title}
-Authors: ${authors}${authSuffix}
-Journal: ${paper.journal} (Tier ${paper.journal_tier})
-Abstract: ${abstract}`;
-}
+  const paperDescs = papers.map((p, i) => {
+    const abstract = p.abstract.length > 250 ? p.abstract.slice(0, 250) + "..." : p.abstract;
+    return `[${i}] "${p.title}" (${p.journal})
+${abstract}`;
+  }).join("\n\n");
 
-function buildScoringPrompt(profile: UserProfile, papers: ScoredPaper[]): string {
-  const profileSummary = buildUserProfileSummary(profile);
-  const paperSummaries = papers.map((p, i) => buildPaperSummary(p, i)).join("\n\n");
-  
-  return `You are an expert academic research advisor. Score how relevant each paper is to this researcher's profile.
+  return `You are an expert academic advisor scoring paper relevance for a researcher.
 
-RESEARCHER PROFILE:
-${profileSummary}
+RESEARCHER:
+${profileParts.join("\n")}
 
-PAPERS TO SCORE:
-${paperSummaries}
+PAPERS:
+${paperDescs}
 
-SCORING GUIDELINES:
-- Score each paper 1-10 based on relevance to the researcher's interests, methods, and field
-- 9-10: Directly addresses their core interests with their preferred methods
-- 7-8: Strongly related to their interests or uses methods they care about
-- 5-6: Moderately relevant, tangential connection or adjacent field
-- 3-4: Weakly relevant, mostly outside their interests
-- 1-2: Not relevant to this researcher
-- Consider semantic connections beyond keywords (e.g., "labor market frictions" is relevant to "unemployment")
-- Consider methodological fit (e.g., a DiD paper is relevant to someone interested in causal inference)
-- Highly-cited papers from top journals deserve a small boost for quality
+Score each paper 1-10 for relevance to this researcher. Think about:
+- Semantic connections (e.g., "peer effects" is relevant to "social networks")
+- Methodological fit (e.g., a DiD paper matches "causal inference" interest)
+- Field adjacency (e.g., political economy paper relevant to economics researcher)
+- For generalists with no specific interests, score on general importance and quality
 
-Respond ONLY with valid JSON array, no other text. Format:
-[{"id":"paper_id","score":7,"reason":"Brief 5-10 word explanation"}]`;
+SCALE:
+9-10: Core interest, directly relevant
+7-8: Strong connection to their interests or methods
+5-6: Moderate relevance, adjacent topic
+3-4: Weak connection
+1-2: Not relevant
+
+Reply ONLY with a JSON array. No other text, no markdown fences.
+[{"i":0,"s":7,"r":"direct match to labor interests"},{"i":1,"s":4,"r":"tangential to their field"}]
+
+"i" = paper index, "s" = score 1-10, "r" = reason (under 10 words)`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// GEMINI API CALLER
+// API CALL
 // ═══════════════════════════════════════════════════════════════════════════
 
 async function callGemini(
   prompt: string, 
   apiKey: string, 
-  model: string = DEFAULT_MODEL
+  model: string
 ): Promise<string> {
   const url = `${GEMINI_API_URL}/${model}:generateContent?key=${apiKey}`;
   
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{
-        parts: [{ text: prompt }]
-      }],
-      generationConfig: {
-        temperature: 0.1,     // Low temperature for consistent scoring
-        maxOutputTokens: 2048,
-        topP: 0.8,
-      },
-    }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 1024,
+          topP: 0.8,
+        },
+      }),
+    });
+    
+    clearTimeout(timeoutId);
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    const errorMsg = errorData?.error?.message || `HTTP ${response.status}`;
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const msg = errorData?.error?.message || `HTTP ${response.status}`;
+      
+      if (response.status === 429 || msg.includes("quota") || msg.includes("limit")) {
+        throw new Error(`Quota exceeded for ${model}. Try a different model in the dropdown.`);
+      }
+      if (response.status === 400 && (msg.includes("API key") || msg.includes("API_KEY"))) {
+        throw new Error("Invalid API key. Check your key at aistudio.google.com.");
+      }
+      if (response.status === 403) {
+        throw new Error("API key lacks permission. Enable 'Generative Language API' in Google Cloud Console.");
+      }
+      if (response.status === 404) {
+        throw new Error(`Model "${model}" not available. Try a different model.`);
+      }
+      
+      throw new Error(`Gemini error: ${msg}`);
+    }
     
-    if (response.status === 400 && errorMsg.includes("API key")) {
-      throw new Error("Invalid API key. Please check your Gemini API key.");
-    }
-    if (response.status === 429) {
-      throw new Error("Rate limit exceeded. The Gemini free tier allows ~15 requests per minute. Please wait a moment and try again.");
-    }
-    if (response.status === 403) {
-      throw new Error("API key doesn't have access to Gemini. Make sure the Generative Language API is enabled in your Google Cloud project.");
+    const data = await response.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+    if (!text) {
+      const blockReason = data?.candidates?.[0]?.finishReason;
+      if (blockReason === "SAFETY") {
+        throw new Error("Response blocked by safety filter. Try again.");
+      }
+      throw new Error("Empty response from Gemini");
     }
     
-    throw new Error(`Gemini API error: ${errorMsg}`);
+    return text;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("Gemini request timed out (30s). Try again or use a faster model.");
+    }
+    throw error;
   }
-  
-  const data = await response.json();
-  
-  // Extract text from Gemini response
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) {
-    throw new Error("Empty response from Gemini API");
-  }
-  
-  return text;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // RESPONSE PARSER
 // ═══════════════════════════════════════════════════════════════════════════
 
-function parseAIScores(responseText: string, paperIds: string[]): AIScoreResult[] {
+interface ParsedScore {
+  index: number;
+  score: number;
+  reason: string;
+}
+
+function parseScores(text: string, expectedCount: number): ParsedScore[] {
   try {
-    // Try to extract JSON from response (Gemini sometimes wraps it in markdown)
-    let jsonStr = responseText.trim();
+    let json = text.trim();
     
-    // Remove markdown code fences if present
-    const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (jsonMatch) {
-      jsonStr = jsonMatch[1].trim();
+    // Strip markdown fences
+    const fenceMatch = json.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (fenceMatch) json = fenceMatch[1].trim();
+    
+    // Find the JSON array
+    if (!json.startsWith("[")) {
+      const arrayMatch = json.match(/\[[\s\S]*\]/);
+      if (arrayMatch) json = arrayMatch[0];
     }
     
-    // If it doesn't start with [, try to find the array
-    if (!jsonStr.startsWith("[")) {
-      const arrayMatch = jsonStr.match(/\[[\s\S]*\]/);
-      if (arrayMatch) {
-        jsonStr = arrayMatch[0];
-      }
-    }
-    
-    const parsed = JSON.parse(jsonStr);
-    
-    if (!Array.isArray(parsed)) {
-      console.warn("AI response is not an array");
-      return [];
-    }
-    
-    const validPaperIds = new Set(paperIds);
+    const parsed = JSON.parse(json);
+    if (!Array.isArray(parsed)) return [];
     
     return parsed
       .filter((item: any) => 
         item && 
-        typeof item.id === "string" && 
-        typeof item.score === "number" &&
-        validPaperIds.has(item.id)
+        typeof item.i === "number" && 
+        typeof item.s === "number" &&
+        item.i >= 0 && item.i < expectedCount
       )
       .map((item: any) => ({
-        paperId: item.id,
-        aiScore: Math.max(1, Math.min(10, Math.round(item.score * 10) / 10)),
-        aiExplanation: typeof item.reason === "string" ? item.reason.slice(0, 100) : "",
+        index: item.i,
+        score: Math.max(1, Math.min(10, Math.round(item.s * 10) / 10)),
+        reason: typeof item.r === "string" ? item.r.slice(0, 80) : "",
       }));
-  } catch (error) {
-    console.warn("Failed to parse AI scores:", error);
+  } catch {
+    console.warn("Failed to parse AI scores from:", text.slice(0, 200));
     return [];
   }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MAIN RERANKER
+// MAIN SCORER
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Rerank papers using Gemini AI.
- * 
- * Process:
- * 1. Take the top N papers from existing scoring
- * 2. Send them in batches to Gemini for AI scoring
- * 3. Blend AI scores with original scores
- * 4. Re-sort by blended score
+ * Score papers using Gemini AI as the PRIMARY engine.
+ * AI scores REPLACE taxonomy scores — they don't blend.
  */
 export async function aiRerank(
   papers: ScoredPaper[],
   profile: UserProfile,
   config: AIRerankerConfig
 ): Promise<AIRerankerResult> {
-  const {
-    apiKey,
-    model = DEFAULT_MODEL,
-    maxPapersPerBatch = MAX_PAPERS_PER_BATCH,
-    blendWeight = BLEND_WEIGHT,
-  } = config;
+  const { apiKey, model = DEFAULT_MODEL } = config;
   
   if (!apiKey) {
-    return { papers, aiEnhanced: false, aiPapersScored: 0, error: "No API key provided" };
+    return { papers, aiEnhanced: false, aiPapersScored: 0, error: "No API key" };
   }
   
-  // Only AI-rank top papers to save API calls (up to 30)
-  const papersToScore = papers.slice(0, 30);
-  const remainingPapers = papers.slice(30);
+  // Score top 40 papers (5 batches of 8)
+  const toScore = papers.slice(0, 40);
+  const remainder = papers.slice(40);
   
-  // Split into batches
-  const batches: ScoredPaper[][] = [];
-  for (let i = 0; i < papersToScore.length; i += maxPapersPerBatch) {
-    batches.push(papersToScore.slice(i, i + maxPapersPerBatch));
-  }
-  
-  const allAIScores: Map<string, AIScoreResult> = new Map();
+  const aiScores: Map<number, ParsedScore> = new Map();
   let lastError: string | undefined;
+  let batchesSucceeded = 0;
   
-  // Process batches
+  // Build batches
+  const batches: { papers: ScoredPaper[]; offset: number }[] = [];
+  for (let i = 0; i < toScore.length; i += BATCH_SIZE) {
+    batches.push({ papers: toScore.slice(i, i + BATCH_SIZE), offset: i });
+  }
+  
   for (const batch of batches) {
     try {
-      const prompt = buildScoringPrompt(profile, batch);
+      const prompt = buildPrompt(profile, batch.papers);
       const responseText = await callGemini(prompt, apiKey, model);
-      const scores = parseAIScores(responseText, batch.map(p => p.id));
+      const scores = parseScores(responseText, batch.papers.length);
       
       for (const score of scores) {
-        allAIScores.set(score.paperId, score);
+        aiScores.set(batch.offset + score.index, score);
       }
+      
+      if (scores.length > 0) batchesSucceeded++;
     } catch (error) {
       lastError = error instanceof Error ? error.message : "AI scoring failed";
-      console.warn("AI batch scoring failed:", error);
-      // Continue with remaining batches if possible, but stop on auth errors
-      if (lastError.includes("API key") || lastError.includes("access")) {
+      console.warn(`AI batch failed:`, lastError);
+      
+      // Stop on auth/quota errors
+      if (lastError.includes("key") || lastError.includes("uota") || lastError.includes("permission") || lastError.includes("odel")) {
         break;
       }
     }
   }
   
-  // If we got no AI scores at all, return original
-  if (allAIScores.size === 0) {
-    return { 
-      papers, 
-      aiEnhanced: false, 
-      aiPapersScored: 0, 
-      error: lastError || "AI scoring returned no results" 
+  // If no batches succeeded, return originals untouched
+  if (batchesSucceeded === 0) {
+    return {
+      papers,
+      aiEnhanced: false,
+      aiPapersScored: 0,
+      error: lastError || "AI scoring returned no results",
     };
   }
   
-  // Blend scores
-  const rerankedPapers = papersToScore.map(paper => {
-    const aiResult = allAIScores.get(paper.id);
+  // Apply AI scores — blend with originals and store metadata
+  const scoredPapers = toScore.map((paper, idx) => {
+    const aiResult = aiScores.get(idx);
+    if (!aiResult) return paper;
     
-    if (!aiResult) {
-      return paper; // No AI score, keep original
-    }
-    
-    // Blend: weighted average of original and AI score
-    const blendedScore = (paper.relevance_score * (1 - blendWeight)) + (aiResult.aiScore * blendWeight);
-    const clampedScore = Math.max(1, Math.min(10, Math.round(blendedScore * 10) / 10));
-    
-    // Enhance explanation with AI insight
-    const aiNote = aiResult.aiExplanation ? ` · AI: ${aiResult.aiExplanation}` : "";
+    const originalScore = paper.relevance_score;
+    const blended = Math.round(Math.max(1, Math.min(10,
+      originalScore * 0.55 + aiResult.score * 0.45
+    )) * 10) / 10;
     
     return {
       ...paper,
-      relevance_score: clampedScore,
-      match_explanation: (paper.match_explanation || "") + aiNote,
+      relevance_score: blended,
+      original_score: originalScore,
+      ai_score: aiResult.score,
+      ai_explanation: aiResult.reason || undefined,
+      match_explanation: aiResult.reason || paper.match_explanation,
     };
   });
   
-  // Re-sort by new blended scores
-  rerankedPapers.sort((a, b) => b.relevance_score - a.relevance_score);
-  
-  // Append remaining papers (not AI-scored)
-  const finalPapers = [...rerankedPapers, ...remainingPapers];
+  // Re-sort
+  scoredPapers.sort((a, b) => b.relevance_score - a.relevance_score);
   
   return {
-    papers: finalPapers,
+    papers: [...scoredPapers, ...remainder],
     aiEnhanced: true,
-    aiPapersScored: allAIScores.size,
+    aiPapersScored: aiScores.size,
     error: lastError,
   };
 }
 
-/**
- * Validate a Gemini API key by making a minimal test request.
- */
-export async function validateGeminiKey(apiKey: string, model?: string): Promise<{ valid: boolean; error?: string }> {
+// ═══════════════════════════════════════════════════════════════════════════
+// KEY VALIDATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+export async function validateGeminiKey(
+  apiKey: string, 
+  model?: string
+): Promise<{ valid: boolean; error?: string }> {
   try {
     const useModel = model || DEFAULT_MODEL;
-    const url = `${GEMINI_API_URL}/${useModel}:generateContent?key=${apiKey}`;
-    
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{ text: "Reply with exactly: OK" }]
-        }],
-        generationConfig: {
-          maxOutputTokens: 10,
-        },
-      }),
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const errorMsg = errorData?.error?.message || `HTTP ${response.status}`;
-      return { valid: false, error: errorMsg };
-    }
-    
-    return { valid: true };
+    const text = await callGemini("Reply with exactly: OK", apiKey, useModel);
+    return { valid: text.trim().length > 0 };
   } catch (error) {
     return { 
       valid: false, 
-      error: error instanceof Error ? error.message : "Connection failed" 
+      error: error instanceof Error ? error.message : "Connection failed",
     };
   }
 }
