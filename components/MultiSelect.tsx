@@ -15,49 +15,33 @@ interface MultiSelectProps {
 }
 
 export function MultiSelect({
-  options,
-  selected,
-  onChange,
+  options, selected, onChange,
   placeholder = "Select options...",
-  maxSelections,
-  searchable = true,
-  groups,
+  maxSelections, searchable = true, groups,
 }: MultiSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
-      ) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     };
-
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Focus input when opening
   useEffect(() => {
-    if (isOpen && inputRef.current) {
-      inputRef.current.focus();
-    }
+    if (isOpen && inputRef.current) inputRef.current.focus();
   }, [isOpen]);
 
-  // Filter options based on search
   const filteredOptions = search
-    ? options.filter((opt) =>
-        opt.toLowerCase().includes(search.toLowerCase())
-      )
+    ? options.filter((opt) => opt.toLowerCase().includes(search.toLowerCase()))
     : options;
 
-  // Get grouped filtered options if provided
   const getGroupedOptions = (): OptionGroup[] | null => {
     if (!groups) return null;
     const result: OptionGroup[] = [];
@@ -65,9 +49,7 @@ export function MultiSelect({
       const filtered = group.options.filter((opt) =>
         search ? opt.toLowerCase().includes(search.toLowerCase()) : true
       );
-      if (filtered.length > 0) {
-        result.push({ label: group.label, options: filtered });
-      }
+      if (filtered.length > 0) result.push({ label: group.label, options: filtered });
     }
     return result.length > 0 ? result : null;
   };
@@ -78,158 +60,121 @@ export function MultiSelect({
     if (selected.includes(option)) {
       onChange(selected.filter((s) => s !== option));
     } else {
-      if (maxSelections && selected.length >= maxSelections) {
-        return;
-      }
+      if (maxSelections && selected.length >= maxSelections) return;
       onChange([...selected, option]);
     }
   };
 
-  const removeOption = (option: string) => {
-    onChange(selected.filter((s) => s !== option));
-  };
-
-  const clearAll = () => {
-    onChange([]);
-  };
+  const removeOption = (option: string) => onChange(selected.filter((s) => s !== option));
+  const clearAll = () => onChange([]);
 
   return (
     <div ref={containerRef} className="relative">
-      {/* Trigger */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex w-full items-center justify-between rounded-lg border border-paper-200 bg-white px-4 py-2.5 text-left transition-all hover:border-paper-300 focus:border-paper-400 focus:outline-none focus:ring-2 focus:ring-paper-200"
+        className="flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-left transition-all"
+        style={{
+          border: "1px solid var(--border-subtle)",
+          background: "var(--bg-card)",
+          color: selected.length === 0 ? "var(--ink-faint)" : "var(--ink-soft)",
+        }}
       >
-        <span className="truncate text-paper-600">
-          {selected.length === 0
-            ? placeholder
-            : `${selected.length} selected`}
+        <span className="truncate">
+          {selected.length === 0 ? placeholder : `${selected.length} selected`}
         </span>
-        <ChevronDown
-          className={`ml-2 h-4 w-4 shrink-0 text-paper-400 transition-transform ${
-            isOpen ? "rotate-180" : ""
-          }`}
-        />
+        <ChevronDown className={`ml-2 h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
+          style={{ color: "var(--ink-faint)" }} />
       </button>
 
-      {/* Selected tags */}
       {selected.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {selected.slice(0, 5).map((option) => (
-            <span
-              key={option}
-              className="inline-flex items-center gap-1 rounded-md bg-paper-100 px-2 py-0.5 text-xs font-medium text-paper-700"
-            >
+            <span key={option} className="tag tag-interest">
               {option.length > 25 ? option.substring(0, 25) + "…" : option}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  removeOption(option);
-                }}
-                className="ml-0.5 rounded-full p-0.5 hover:bg-paper-200"
-              >
+              <button type="button" onClick={(e) => { e.stopPropagation(); removeOption(option); }}
+                className="ml-0.5 rounded-full p-0.5 hover:opacity-70">
                 <X className="h-3 w-3" />
               </button>
             </span>
           ))}
           {selected.length > 5 && (
-            <span className="text-xs text-paper-500">
-              +{selected.length - 5} more
-            </span>
+            <span className="text-xs" style={{ color: "var(--ink-faint)" }}>+{selected.length - 5} more</span>
           )}
-          <button
-            type="button"
-            onClick={clearAll}
-            className="text-xs text-paper-500 hover:text-paper-700"
-          >
+          <button type="button" onClick={clearAll} className="text-xs hover:opacity-70" style={{ color: "var(--ink-faint)" }}>
             Clear all
           </button>
         </div>
       )}
 
-      {/* Dropdown */}
       {isOpen && (
-        <div className="absolute z-50 mt-1 max-h-72 w-full overflow-hidden rounded-lg border border-paper-200 bg-white shadow-lg animate-scale-in">
-          {/* Search input */}
+        <div className="absolute z-50 mt-1 max-h-72 w-full overflow-hidden rounded-xl animate-scale-in"
+          style={{
+            border: "var(--glass-border)",
+            background: "var(--bg-card-hover)",
+            backdropFilter: "blur(var(--glass-blur))",
+            WebkitBackdropFilter: "blur(var(--glass-blur))",
+            boxShadow: "var(--glass-shadow-elevated)",
+          }}>
           {searchable && (
-            <div className="sticky top-0 border-b border-paper-100 bg-white p-2">
+            <div className="sticky top-0 p-2" style={{ borderBottom: "1px solid var(--border-subtle)", background: "var(--bg-card-hover)" }}>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-paper-400" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "var(--ink-faint)" }} />
                 <input
                   ref={inputRef}
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search..."
-                  className="w-full rounded-md border-0 bg-paper-50 py-2 pl-9 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-paper-200"
+                  className="w-full rounded-lg border-0 py-2 pl-9 pr-4 text-sm"
+                  style={{ background: "var(--bg-glass)", color: "var(--ink)" }}
                 />
               </div>
             </div>
           )}
 
-          {/* Options list */}
           <div className="max-h-52 overflow-y-auto p-1">
             {groupedFiltered
-              ? // Grouped options
-                groupedFiltered.map((group) => (
+              ? groupedFiltered.map((group) => (
                   <div key={group.label} className="mb-2">
-                    <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-paper-400">
+                    <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--ink-faint)" }}>
                       {group.label}
                     </div>
                     {group.options.map((option) => (
                       <button
-                        key={option}
-                        type="button"
+                        key={option} type="button"
                         onClick={() => toggleOption(option)}
-                        disabled={
-                          maxSelections !== undefined &&
-                          selected.length >= maxSelections &&
-                          !selected.includes(option)
-                        }
-                        className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm transition-colors ${
-                          selected.includes(option)
-                            ? "bg-paper-100 text-paper-900"
-                            : "text-paper-700 hover:bg-paper-50"
-                        } disabled:cursor-not-allowed disabled:opacity-50`}
+                        disabled={maxSelections !== undefined && selected.length >= maxSelections && !selected.includes(option)}
+                        className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                        style={{
+                          color: selected.includes(option) ? "var(--burgundy)" : "var(--ink-soft)",
+                          background: selected.includes(option) ? "var(--burgundy-wash)" : "transparent",
+                        }}
                       >
                         <span className="truncate">{option}</span>
-                        {selected.includes(option) && (
-                          <Check className="h-4 w-4 shrink-0 text-paper-600" />
-                        )}
+                        {selected.includes(option) && <Check className="h-4 w-4 shrink-0" style={{ color: "var(--burgundy)" }} />}
                       </button>
                     ))}
                   </div>
                 ))
-              : // Flat options
-                filteredOptions.map((option) => (
+              : filteredOptions.map((option) => (
                   <button
-                    key={option}
-                    type="button"
+                    key={option} type="button"
                     onClick={() => toggleOption(option)}
-                    disabled={
-                      maxSelections !== undefined &&
-                      selected.length >= maxSelections &&
-                      !selected.includes(option)
-                    }
-                    className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm transition-colors ${
-                      selected.includes(option)
-                        ? "bg-paper-100 text-paper-900"
-                        : "text-paper-700 hover:bg-paper-50"
-                    } disabled:cursor-not-allowed disabled:opacity-50`}
+                    disabled={maxSelections !== undefined && selected.length >= maxSelections && !selected.includes(option)}
+                    className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                    style={{
+                      color: selected.includes(option) ? "var(--burgundy)" : "var(--ink-soft)",
+                      background: selected.includes(option) ? "var(--burgundy-wash)" : "transparent",
+                    }}
                   >
                     <span className="truncate">{option}</span>
-                    {selected.includes(option) && (
-                      <Check className="h-4 w-4 shrink-0 text-paper-600" />
-                    )}
+                    {selected.includes(option) && <Check className="h-4 w-4 shrink-0" style={{ color: "var(--burgundy)" }} />}
                   </button>
-                ))}
-
+                ))
+            }
             {filteredOptions.length === 0 && (
-              <div className="px-3 py-4 text-center text-sm text-paper-500">
-                No options found
-              </div>
+              <div className="px-3 py-4 text-center text-sm" style={{ color: "var(--ink-muted)" }}>No options found</div>
             )}
           </div>
         </div>
