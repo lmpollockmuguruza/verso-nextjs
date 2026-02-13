@@ -6,18 +6,14 @@ interface ProgressDotsProps {
 }
 
 export function ProgressDots({ current, total }: ProgressDotsProps) {
+  const percentage = ((current - 1) / (total - 1)) * 100;
+  
   return (
-    <div className="progress-dots mb-10">
-      {Array.from({ length: total }, (_, i) => {
-        const step = i + 1;
-        let className = "dot";
-        if (step < current) {
-          className += " done";
-        } else if (step === current) {
-          className += " active";
-        }
-        return <div key={step} className={className} />;
-      })}
+    <div className="progress-bar">
+      <div 
+        className="progress-bar-fill"
+        style={{ width: `${percentage}%` }}
+      />
     </div>
   );
 }
