@@ -820,3 +820,139 @@ export function getJournalInfo(journalName: string): Journal | undefined {
 export function getJournalField(journalName: string): JournalField | undefined {
   return findJournalByName(journalName)?.field;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SMART JOURNAL DEFAULTS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Maps user-facing field selections to recommended journals.
+ * The top-5 general journals are always included.
+ * Field-specific journals are added based on the user's primary field.
+ */
+export const FIELD_TO_JOURNALS: Record<string, string[]> = {
+  "Development Economics": [
+    "Journal of Development Economics", "World Bank Economic Review",
+    "Journal of the European Economic Association", "Economic Journal",
+    "Journal of Human Resources", "Journal of Public Economics",
+  ],
+  "Labor Economics": [
+    "Journal of Labor Economics", "Journal of Human Resources",
+    "AEJ: Applied Economics", "Journal of Public Economics",
+    "Review of Economics and Statistics",
+  ],
+  "Public Economics": [
+    "Journal of Public Economics", "AEJ: Economic Policy",
+    "Journal of Human Resources", "Review of Economics and Statistics",
+    "Economic Policy", "Journal of the European Economic Association",
+  ],
+  "Macroeconomics": [
+    "AEJ: Macroeconomics", "Journal of Monetary Economics",
+    "Review of Economics and Statistics", "Journal of the European Economic Association",
+  ],
+  "Microeconomics": [
+    "AEJ: Microeconomics", "Journal of Economic Theory",
+    "Review of Economics and Statistics",
+  ],
+  "Financial Economics": [
+    "Journal of Finance", "Review of Financial Studies",
+    "Journal of Financial Economics", "Journal of Monetary Economics",
+  ],
+  "Econometrics": [
+    "Journal of Applied Econometrics", "Journal of Business & Economic Statistics",
+    "Review of Economics and Statistics",
+  ],
+  "International Economics": [
+    "Journal of International Economics", "AEJ: Macroeconomics",
+    "Journal of Monetary Economics", "Journal of the European Economic Association",
+  ],
+  "Industrial Organization": [
+    "AEJ: Microeconomics", "Journal of Economic Theory",
+  ],
+  "Behavioral Economics": [
+    "AEJ: Microeconomics", "AEJ: Applied Economics",
+    "Journal of Economic Perspectives",
+  ],
+  "Health Economics": [
+    "Journal of Human Resources", "AEJ: Applied Economics",
+    "AEJ: Economic Policy", "Journal of Public Economics",
+  ],
+  "Environmental Economics": [
+    "AEJ: Economic Policy", "Journal of Public Economics",
+    "Journal of the European Economic Association",
+  ],
+  "Urban Economics": [
+    "AEJ: Applied Economics", "AEJ: Economic Policy",
+    "Review of Economics and Statistics",
+  ],
+  "Economic History": [
+    "Journal of Economic Growth", "Economic Journal",
+    "Journal of the European Economic Association", "Journal of Economic Perspectives",
+  ],
+  "Agricultural Economics": [
+    "Journal of Development Economics", "AEJ: Applied Economics",
+  ],
+  // Political Science
+  "Political Economy": [
+    "AEJ: Economic Policy", "Journal of the European Economic Association",
+    "Economic Policy", "Journal of Public Economics",
+  ],
+  "Comparative Politics": [],
+  "International Relations": [],
+  "American Politics": [],
+  "Public Policy": [
+    "AEJ: Economic Policy", "Journal of Public Economics",
+    "Journal of Human Resources", "Economic Policy",
+  ],
+};
+
+/**
+ * Get a smart journal list based on the user's field and interests.
+ * Always includes top-5 + working papers, then adds field-specific journals.
+ */
+export function getSmartJournalDefaults(
+  primaryField: string,
+  fieldType: "Economics" | "Political Science" | "Both",
+  includeWorkingPapers: boolean
+): string[] {
+  const journals = new Set<string>();
+  
+  // Always include top-5 economics journals
+  Object.entries(ECONOMICS_JOURNALS)
+    .filter(([, j]) => j.tier === 1)
+    .forEach(([name]) => journals.add(name));
+  
+  // Always include top-5 economics tier-2
+  Object.entries(ECONOMICS_JOURNALS)
+    .filter(([, j]) => j.tier === 2)
+    .forEach(([name]) => journals.add(name));
+  
+  // Include polisci if relevant
+  if (fieldType === "Political Science" || fieldType === "Both") {
+    Object.entries(POLISCI_JOURNALS)
+      .filter(([, j]) => j.tier <= 2)
+      .forEach(([name]) => journals.add(name));
+  }
+  
+  // Add field-specific journals
+  const fieldJournals = FIELD_TO_JOURNALS[primaryField] || [];
+  fieldJournals.forEach(name => journals.add(name));
+  
+  // Working papers
+  if (includeWorkingPapers) {
+    getWorkingPapers().forEach(name => journals.add(name));
+  }
+  
+  return Array.from(journals);
+}
+
+/**
+ * Get all available journals as a flat list with metadata for the journal picker.
+ */
+export function getAllJournalsList(): { name: string; field: JournalField; tier: number }[] {
+  return Object.entries(ALL_JOURNALS).map(([name, j]) => ({
+    name,
+    field: j.field,
+    tier: j.tier,
+  }));
+}
