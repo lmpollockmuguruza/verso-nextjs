@@ -74,6 +74,12 @@ function buildPrompt(profile: UserProfile, papers: ScoredPaper[]): string {
   if (profile.region && profile.region !== "Global / No Preference") {
     profileParts.push(`Regional focus: ${profile.region}`);
   }
+  const explorationNote = (profile.exploration_level ?? 0.5) > 0.6
+    ? "This researcher values intellectual EXPLORATION — reward cross-field connections and surprising relevance."
+    : (profile.exploration_level ?? 0.5) < 0.3
+    ? "This researcher wants FOCUSED results — prioritize direct topical matches."
+    : "This researcher wants a MIX of direct matches and interesting discoveries.";
+  profileParts.push(explorationNote);
 
   const paperDescs = papers.map((p, i) => {
     const abstract = p.abstract.length > 250 ? p.abstract.slice(0, 250) + "..." : p.abstract;
@@ -81,7 +87,7 @@ function buildPrompt(profile: UserProfile, papers: ScoredPaper[]): string {
 ${abstract}`;
   }).join("\n\n");
 
-  return `You are an expert academic advisor scoring paper relevance for a researcher.
+  return `You are an expert academic advisor scoring papers for a researcher.
 
 RESEARCHER:
 ${profileParts.join("\n")}
@@ -89,23 +95,28 @@ ${profileParts.join("\n")}
 PAPERS:
 ${paperDescs}
 
-Score each paper 1-10 for relevance to this researcher. Think about:
-- Semantic connections (e.g., "peer effects" is relevant to "social networks")
-- Methodological fit (e.g., a DiD paper matches "causal inference" interest)
-- Field adjacency (e.g., political economy paper relevant to economics researcher)
-- For generalists with no specific interests, score on general importance and quality
+Score each paper on TWO dimensions:
+1. RELEVANCE (r, 1-10): How well does this match their stated interests and methods?
+2. DISCOVERY (d, 1-10): How likely is this to be a valuable surprise — a paper outside their exact focus that a smart colleague would say "you need to read this"?
 
-SCALE:
-9-10: Core interest, directly relevant
-7-8: Strong connection to their interests or methods
-5-6: Moderate relevance, adjacent topic
-3-4: Weak connection
-1-2: Not relevant
+Think about:
+- Semantic connections (e.g., "peer effects" is relevant to "social networks")
+- Methodological innovation (new methods applicable to their field)
+- Cross-field fertilization (e.g., a psych paper relevant to behavioral econ)
+- Papers that challenge assumptions in their field
+- For generalists, score on general importance and quality
+
+SCALE (for both r and d):
+9-10: Exceptional match / must-read discovery
+7-8: Strong connection / very interesting adjacent work
+5-6: Moderate relevance / somewhat interesting
+3-4: Weak connection / low discovery value
+1-2: Not relevant / not interesting
 
 Reply ONLY with a JSON array. No other text, no markdown fences.
-[{"i":0,"s":7,"r":"direct match to labor interests"},{"i":1,"s":4,"r":"tangential to their field"}]
+[{"i":0,"r":7,"d":4,"e":"direct match to labor interests"},{"i":1,"r":3,"d":8,"e":"novel method for their field"}]
 
-"i" = paper index, "s" = score 1-10, "r" = reason (under 10 words)`;
+"i" = paper index, "r" = relevance 1-10, "d" = discovery 1-10, "e" = reason (under 10 words)`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -187,6 +198,7 @@ async function callGemini(
 interface ParsedScore {
   index: number;
   score: number;
+  discovery: number;
   reason: string;
 }
 
@@ -211,13 +223,15 @@ function parseScores(text: string, expectedCount: number): ParsedScore[] {
       .filter((item: any) => 
         item && 
         typeof item.i === "number" && 
-        typeof item.s === "number" &&
+        (typeof item.r === "number" || typeof item.s === "number") &&
         item.i >= 0 && item.i < expectedCount
       )
       .map((item: any) => ({
         index: item.i,
-        score: Math.max(1, Math.min(10, Math.round(item.s * 10) / 10)),
-        reason: typeof item.r === "string" ? item.r.slice(0, 80) : "",
+        // Support both new format (r/d) and old format (s)
+        score: Math.max(1, Math.min(10, Math.round((item.r ?? item.s ?? 5) * 10) / 10)),
+        discovery: Math.max(1, Math.min(10, Math.round((item.d ?? item.r ?? item.s ?? 5) * 10) / 10)),
+        reason: typeof item.e === "string" ? item.e.slice(0, 80) : (typeof item.r === "string" ? (item.r as string).slice(0, 80) : ""),
       }));
   } catch {
     console.warn("Failed to parse AI scores from:", text.slice(0, 200));
@@ -230,8 +244,8 @@ function parseScores(text: string, expectedCount: number): ParsedScore[] {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Score papers using Gemini AI as the PRIMARY engine.
- * AI scores REPLACE taxonomy scores — they don't blend.
+ * Score papers using Gemini AI, blended with taxonomy scores.
+ * The blend ratio shifts based on exploration_level.
  */
 export async function aiRerank(
   papers: ScoredPaper[],
@@ -273,14 +287,12 @@ export async function aiRerank(
       lastError = error instanceof Error ? error.message : "AI scoring failed";
       console.warn(`AI batch failed:`, lastError);
       
-      // Stop on auth/quota errors
       if (lastError.includes("key") || lastError.includes("uota") || lastError.includes("permission") || lastError.includes("odel")) {
         break;
       }
     }
   }
   
-  // If no batches succeeded, return originals untouched
   if (batchesSucceeded === 0) {
     return {
       papers,
@@ -290,14 +302,25 @@ export async function aiRerank(
     };
   }
   
-  // Apply AI scores — blend with originals and store metadata
+  // Exploration-aware blending
+  const explorationLevel = profile.exploration_level ?? 0.5;
+  
+  // In narrow mode: taxonomy matters more (it's precise). In explore mode: AI matters more (it finds connections).
+  const taxonomyWeight = 0.55 - explorationLevel * 0.2;  // 0.55 → 0.35
+  const aiWeight = 1.0 - taxonomyWeight;                  // 0.45 → 0.65
+  
   const scoredPapers = toScore.map((paper, idx) => {
     const aiResult = aiScores.get(idx);
     if (!aiResult) return paper;
     
     const originalScore = paper.relevance_score;
+    
+    // Blend AI relevance and discovery based on exploration level
+    const aiCombined = aiResult.score * (1 - explorationLevel * 0.4) 
+                     + aiResult.discovery * explorationLevel * 0.4;
+    
     const blended = Math.round(Math.max(1, Math.min(10,
-      originalScore * 0.55 + aiResult.score * 0.45
+      originalScore * taxonomyWeight + aiCombined * aiWeight
     )) * 10) / 10;
     
     return {
@@ -305,6 +328,7 @@ export async function aiRerank(
       relevance_score: blended,
       original_score: originalScore,
       ai_score: aiResult.score,
+      ai_discovery: aiResult.discovery,
       ai_explanation: aiResult.reason || undefined,
       match_explanation: aiResult.reason || paper.match_explanation,
     };
