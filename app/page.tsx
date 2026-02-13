@@ -226,8 +226,8 @@ export default function Home() {
       let aiPapersScored = 0;
       let aiError: string | null = null;
 
-      // AI Reranking step (if enabled and key is valid)
-      if (state.aiEnabled && state.geminiApiKey && state.aiKeyValid) {
+      // AI Scoring step (if enabled and key is present)
+      if (state.aiEnabled && state.geminiApiKey.trim()) {
         updateState({ aiReranking: true });
         
         try {
@@ -243,20 +243,19 @@ export default function Home() {
             }),
           });
 
-          if (aiRes.ok) {
-            const aiData = await aiRes.json();
-            if (aiData.aiEnhanced) {
-              finalPapers = aiData.papers;
-              aiEnhanced = true;
-              aiPapersScored = aiData.aiPapersScored || 0;
-            }
-            if (aiData.error) {
-              aiError = aiData.error;
-            }
+          const aiData = await aiRes.json();
+          
+          if (aiRes.ok && aiData.aiEnhanced) {
+            finalPapers = aiData.papers;
+            aiEnhanced = true;
+            aiPapersScored = aiData.aiPapersScored || 0;
+          }
+          if (aiData.error) {
+            aiError = aiData.error;
           }
         } catch (err) {
-          aiError = err instanceof Error ? err.message : "AI reranking failed";
-          console.warn("AI reranking failed:", err);
+          aiError = err instanceof Error ? err.message : "AI scoring failed";
+          console.warn("AI scoring failed:", err);
         }
       }
 
@@ -995,8 +994,8 @@ function StepSources({ state, updateState, nextStep, prevStep, discoverPapers }:
         {state.selectedAdjacentFields.length > 0 && (
           <span> + {state.selectedAdjacentFields.length} related fields</span>
         )}
-        {state.aiEnabled && state.aiKeyValid && (
-          <span className="text-purple-600"> + AI reranking</span>
+        {state.aiEnabled && state.geminiApiKey.trim() && (
+          <span className="text-purple-600"> + AI scoring</span>
         )}
       </div>
 
@@ -1093,22 +1092,25 @@ function StepResults({ state, updateState, startOver, discoverPapers, goToStep }
       <h1 className="text-center font-display text-display-lg font-light text-paper-900">
         For you, {state.name}
       </h1>
-      <p className="mt-2 text-center text-paper-500">{state.summary}</p>
+      <p className="mt-2 text-center text-paper-500">
+        {state.summary}
+        {state.aiEnhanced && " · Scored by AI"}
+      </p>
 
       {/* AI Enhancement Badge */}
       {state.aiEnhanced && (
         <div className="mt-3 mx-auto flex items-center justify-center gap-2 rounded-full bg-purple-50 border border-purple-200 px-4 py-1.5 w-fit">
           <Brain className="h-4 w-4 text-purple-600" />
           <span className="text-xs font-medium text-purple-700">
-            AI-enhanced · {state.aiPapersScored} papers re-ranked by Gemini
+            AI-scored · {state.aiPapersScored} papers ranked by Gemini
           </span>
         </div>
       )}
-      {state.aiError && !state.aiEnhanced && state.aiEnabled && (
-        <div className="mt-3 mx-auto flex items-center justify-center gap-2 rounded-full bg-amber-50 border border-amber-200 px-4 py-1.5 w-fit">
-          <AlertCircle className="h-4 w-4 text-amber-600" />
+      {!state.aiEnhanced && state.aiEnabled && state.geminiApiKey.trim() && (
+        <div className="mt-3 mx-auto flex items-center justify-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-4 py-2 w-fit max-w-md">
+          <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
           <span className="text-xs text-amber-700">
-            AI enhancement unavailable: {state.aiError}
+            AI scoring failed{state.aiError ? `: ${state.aiError}` : ""}. Showing taxonomy-based results. Try a different model or check your API key.
           </span>
         </div>
       )}
