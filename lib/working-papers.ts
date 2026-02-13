@@ -241,13 +241,13 @@ export async function fetchWorkingPapersFromOpenAlex(
   const fromDate = startDate.toISOString().split("T")[0];
   const toDate = endDate.toISOString().split("T")[0];
   
-  // Strategy 1: Try to find NBER source ID dynamically
-  const nberSourceId = await findOpenAlexSourceId("NBER");
-  
-  // Build a list of filters to try, each targeting different paper sources
+  // Build filters that target ACTUAL working paper series (not institution affiliations)
+  // Institution-based queries are deliberately excluded because they return ALL papers
+  // by affiliated authors (e.g., an NBER economist's paper in JAMA or Cancer)
   const filters: { filter: string; label: string }[] = [];
   
-  // NBER source-based filter
+  // NBER via source name search
+  const nberSourceId = await findOpenAlexSourceId("NBER");
   if (nberSourceId) {
     filters.push({
       filter: `primary_location.source.id:${nberSourceId}`,
@@ -255,13 +255,19 @@ export async function fetchWorkingPapersFromOpenAlex(
     });
   }
   
-  // CEPR via ISSN (most reliable for CEPR) — try both print and online ISSNs
+  // NBER via ISSN fallback
+  filters.push({
+    filter: `primary_location.source.issn:0898-2937`,
+    label: "NBER ISSN"
+  });
+  
+  // CEPR via ISSN (both print and online)
   filters.push({
     filter: `primary_location.source.issn:${CONFIG.CEPR_ISSN}|${CONFIG.CEPR_ISSN_ONLINE}`,
     label: "CEPR ISSN"
   });
   
-  // CEPR source name search fallback
+  // CEPR via source name search fallback
   const ceprSourceId = await findOpenAlexSourceId("CEPR Discussion");
   if (ceprSourceId) {
     filters.push({
@@ -269,18 +275,6 @@ export async function fetchWorkingPapersFromOpenAlex(
       label: "CEPR source"
     });
   }
-
-  // Fallback: Search by institution affiliation for NBER
-  filters.push({
-    filter: `authorships.institutions.id:${CONFIG.NBER_INSTITUTION_ID}`,
-    label: "NBER institution"
-  });
-  
-  // Fallback: Search by institution affiliation for CEPR
-  filters.push({
-    filter: `authorships.institutions.id:${CONFIG.CEPR_INSTITUTION_ID}`,
-    label: "CEPR institution"
-  });
   
   for (const { filter, label } of filters) {
     if (papers.length >= maxResults) break;
