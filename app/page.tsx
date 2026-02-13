@@ -348,6 +348,7 @@ function StepWelcome({ state, updateState, nextStep }: StepProps) {
           type="text"
           value={state.name}
           onChange={(e) => updateState({ name: e.target.value })}
+          onKeyDown={(e) => { if (e.key === "Enter" && state.name.trim()) nextStep(); }}
           placeholder="First name"
           className="mt-6 w-full"
           autoFocus
@@ -910,6 +911,26 @@ function StepSources({ state, updateState, nextStep, prevStep, discoverPapers }:
                     aiKeyValid: null,
                     aiError: null 
                   })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && state.geminiApiKey.trim()) {
+                      e.currentTarget.blur();
+                      // Trigger the same validate logic as the Test button
+                      (async () => {
+                        updateState({ aiKeyValidating: true, aiKeyValid: null });
+                        try {
+                          const res = await fetch("/api/ai-rerank", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ action: "validate", apiKey: state.geminiApiKey, model: state.geminiModel }),
+                          });
+                          const data = await res.json();
+                          updateState({ aiKeyValid: data.valid, aiKeyValidating: false, aiError: data.valid ? null : data.error });
+                        } catch {
+                          updateState({ aiKeyValid: false, aiKeyValidating: false, aiError: "Connection failed" });
+                        }
+                      })();
+                    }
+                  }}
                   placeholder="Paste your API key here"
                   className="flex-1 text-sm rounded-lg border border-purple-200 px-3 py-2 bg-white focus:border-purple-400 focus:ring-purple-400"
                 />
