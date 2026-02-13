@@ -69,6 +69,7 @@ interface AppState {
   error: string | null;
   // AI enhancement
   geminiApiKey: string;
+  geminiModel: string;
   aiEnabled: boolean;
   aiKeyValid: boolean | null; // null = not yet validated
   aiKeyValidating: boolean;
@@ -99,6 +100,7 @@ const initialState: AppState = {
   error: null,
   // AI enhancement
   geminiApiKey: "",
+  geminiModel: "gemini-2.5-flash",
   aiEnabled: false,
   aiKeyValid: null,
   aiKeyValidating: false,
@@ -235,6 +237,7 @@ export default function Home() {
             body: JSON.stringify({
               action: "rerank",
               apiKey: state.geminiApiKey,
+              model: state.geminiModel,
               profile,
               papers: recommendData.papers,
             }),
@@ -919,7 +922,7 @@ function StepSources({ state, updateState, nextStep, prevStep, discoverPapers }:
                       const res = await fetch("/api/ai-rerank", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ action: "validate", apiKey: state.geminiApiKey }),
+                        body: JSON.stringify({ action: "validate", apiKey: state.geminiApiKey, model: state.geminiModel }),
                       });
                       const data = await res.json();
                       updateState({ 
@@ -948,6 +951,23 @@ function StepSources({ state, updateState, nextStep, prevStep, discoverPapers }:
                   <AlertCircle className="h-3.5 w-3.5" /> {state.aiError || "Invalid key"}
                 </p>
               )}
+            </div>
+            
+            <div>
+              <label className="text-xs font-medium text-purple-700">Model</label>
+              <select
+                value={state.geminiModel}
+                onChange={(e) => updateState({ geminiModel: e.target.value, aiKeyValid: null, aiError: null })}
+                className="mt-1 w-full text-sm rounded-lg border border-purple-200 px-3 py-2 bg-white focus:border-purple-400 focus:ring-purple-400"
+              >
+                <option value="gemini-2.5-flash">Gemini 2.5 Flash (recommended)</option>
+                <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash-Lite</option>
+                <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+              </select>
+              <p className="mt-1 text-xs text-purple-500">
+                If you get a quota error, try a different model — free tier limits vary.
+              </p>
             </div>
             
             <div className="rounded-lg bg-white/70 p-3 text-xs text-purple-700 space-y-1.5">
