@@ -8,15 +8,15 @@ export type JournalField =
   | "psychology" 
   | "sociology" 
   | "management"
-  | "working_papers";  // NBER, CEPR, etc.
+  | "working_papers";
 
 export interface Journal {
   name: string;
-  issn?: string;        // Optional - some sources (like CEPR) don't have ISSNs
-  openAlexId?: string;  // OpenAlex source ID for sources without ISSN
+  issn?: string;
+  openAlexId?: string;
   field: JournalField;
   tier: 1 | 2 | 3;
-  altNames?: string[];  // Alternate names that OpenAlex might use
+  altNames?: string[];
 }
 
 export interface Concept {
@@ -49,6 +49,11 @@ export interface ScoredPaper extends Paper {
   matched_topics: string[];
   match_explanation: string;
   is_adjacent_field?: boolean;
+  match_tier?: "core" | "explore" | "discovery";
+  ai_score?: number;
+  ai_discovery?: number;
+  original_score?: number;
+  ai_explanation?: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -62,13 +67,14 @@ export interface UserProfile {
   name: string;
   academic_level: string;
   primary_field: string;
-  interests: string[];           // Now optional (can be empty)
-  methods: string[];             // Now optional (can be empty)
+  interests: string[];
+  methods: string[];
   region: string;
   approach_preference: ApproachPreference;
   experience_type: ExperienceType;
   include_adjacent_fields: boolean;
   selected_adjacent_fields: JournalField[];
+  exploration_level: number; // 0 = narrow, 0.5 = balanced, 1 = exploratory
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -99,31 +105,11 @@ export interface ProcessPapersResponse {
 }
 
 export interface JournalOptions {
-  economics: {
-    tier1: string[];
-    tier2: string[];
-    tier3: string[];
-  };
-  polisci: {
-    tier1: string[];
-    tier2: string[];
-    tier3: string[];
-  };
-  psychology: {
-    tier1: string[];
-    tier2: string[];
-    tier3: string[];
-  };
-  sociology: {
-    tier1: string[];
-    tier2: string[];
-    tier3: string[];
-  };
-  management: {
-    tier1: string[];
-    tier2: string[];
-    tier3: string[];
-  };
+  economics: { tier1: string[]; tier2: string[]; tier3: string[] };
+  polisci: { tier1: string[]; tier2: string[]; tier3: string[] };
+  psychology: { tier1: string[]; tier2: string[]; tier3: string[] };
+  sociology: { tier1: string[]; tier2: string[]; tier3: string[] };
+  management: { tier1: string[]; tier2: string[]; tier3: string[] };
 }
 
 export interface ProfileOptions {
@@ -155,11 +141,13 @@ export interface MatchScore {
   method_score: number;
   quality_score: number;
   field_relevance_score: number;
+  discovery_score: number;
   matched_interests: string[];
   matched_methods: string[];
   matched_topics: string[];
   explanation: string;
   is_adjacent_field: boolean;
+  match_tier: "core" | "explore" | "discovery";
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -189,12 +177,8 @@ export interface OpenAlexWork {
 }
 
 export interface OpenAlexAuthorship {
-  author?: {
-    display_name?: string;
-  };
-  institutions?: {
-    display_name?: string;
-  }[];
+  author?: { display_name?: string };
+  institutions?: { display_name?: string }[];
 }
 
 export interface OpenAlexConcept {
@@ -204,10 +188,7 @@ export interface OpenAlexConcept {
 
 export interface OpenAlexResponse {
   results: OpenAlexWork[];
-  meta?: {
-    count?: number;
-    next_cursor?: string;
-  };
+  meta?: { count?: number; next_cursor?: string };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
