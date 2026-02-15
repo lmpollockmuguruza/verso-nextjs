@@ -1,10 +1,10 @@
-# Econvery
+# verso
+
+Slightly outdated Readme. Awaiting continuing updates given testing.
 
 **Discover research that matters to you.**
 
-Econvery is a personalized academic paper discovery app for economics and political science researchers. It fetches recent papers from 50+ top journals via the OpenAlex API and uses a sophisticated relevance scoring algorithm to find papers that match your research interests and methodological preferences.
-
-![Econvery Screenshot](./screenshot.png)
+verso is a personalized academic paper discovery app for economics and political science researchers. It fetches recent papers from 50+ top journals via the OpenAlex API and uses a sophisticated relevance scoring algorithm to find papers that match your research interests and methodological preferences.
 
 ## Features
 
