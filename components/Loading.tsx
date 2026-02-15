@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Sparkles } from "lucide-react";
 
 const LOADING_QUIPS = [
   "Remember to drink water today",
@@ -35,16 +34,33 @@ interface LoadingProps {
 
 export function Loading({ message = "Loading...", subMessage }: LoadingProps) {
   return (
-    <div className="flex flex-col items-center justify-center py-16">
-      <div className="relative">
-        <div className="absolute -inset-4 animate-pulse-subtle rounded-full" style={{ background: "var(--burgundy-wash)" }} />
-        <Sparkles className="relative h-8 w-8 animate-pulse" style={{ color: "var(--burgundy)" }} />
-      </div>
-      <p className="mt-6 font-display text-lg font-medium" style={{ color: "var(--ink)" }}>
+    <div className="flex flex-col items-center justify-center py-16 animate-fade-in">
+      <p
+        className="font-mono text-xs"
+        style={{ color: "var(--fg-muted)" }}
+      >
         {message}
       </p>
+      <div
+        className="mt-3 w-48 relative overflow-hidden"
+        style={{ height: "1px", background: "var(--border)" }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            height: "100%",
+            width: "40%",
+            background: "var(--accent)",
+            animation: "loadingSlide 1.5s ease infinite",
+          }}
+        />
+      </div>
       {subMessage && (
-        <p className="mt-1 text-sm" style={{ color: "var(--ink-muted)" }}>{subMessage}</p>
+        <p className="mt-3 text-xs" style={{ color: "var(--fg-faint)" }}>
+          {subMessage}
+        </p>
       )}
     </div>
   );
@@ -52,15 +68,9 @@ export function Loading({ message = "Loading...", subMessage }: LoadingProps) {
 
 export function LoadingDots() {
   return (
-    <div className="flex items-center gap-1">
-      {[0, 1, 2].map((i) => (
-        <div
-          key={i}
-          className="h-1.5 w-1.5 animate-bounce rounded-full"
-          style={{ background: "var(--burgundy)", animationDelay: `${i * 150}ms` }}
-        />
-      ))}
-    </div>
+    <span className="font-mono text-xs" style={{ color: "var(--fg-faint)" }}>
+      <span className="animate-pulse-subtle">...</span>
+    </span>
   );
 }
 
@@ -69,7 +79,7 @@ interface FunLoadingProps {
 }
 
 export function FunLoading({ userName }: FunLoadingProps) {
-  const [quipIndex, setQuipIndex] = useState(() => 
+  const [quipIndex, setQuipIndex] = useState(() =>
     Math.floor(Math.random() * LOADING_QUIPS.length)
   );
   const [fade, setFade] = useState(true);
@@ -86,45 +96,47 @@ export function FunLoading({ userName }: FunLoadingProps) {
   }, []);
 
   return (
-    <div className="flex flex-col items-center justify-center py-12">
-      {/* Animated icon */}
-      <div className="relative mb-8">
-        <div className="absolute -inset-6 animate-pulse rounded-full"
-          style={{ background: "linear-gradient(135deg, var(--burgundy-wash), transparent)" }} />
-        <div className="relative flex h-16 w-16 items-center justify-center rounded-full"
-          style={{ background: "var(--bg-card)", boxShadow: "var(--glass-shadow)", border: "var(--glass-border)" }}>
-          <Sparkles className="h-8 w-8 animate-pulse" style={{ color: "var(--burgundy)" }} />
-        </div>
-      </div>
-
-      <h2 className="font-display text-display-sm font-normal" style={{ color: "var(--ink)" }}>
-        Analyzing papers for you, {userName}
-      </h2>
-      <p className="mt-2" style={{ color: "var(--ink-muted)" }}>
-        This usually takes a few seconds...
+    <div className="flex flex-col items-center justify-center py-12 animate-fade-in">
+      {/* Header */}
+      <p
+        className="font-serif text-display-sm"
+        style={{ color: "var(--fg)" }}
+      >
+        Searching for you, {userName}
+      </p>
+      <p className="mt-1 font-mono text-xs" style={{ color: "var(--fg-faint)" }}>
+        Scanning 50+ journals from the last 30 days...
       </p>
 
-      {/* Progress dots */}
-      <div className="mt-6 flex items-center gap-1.5">
-        {[0, 1, 2, 3, 4].map((i) => (
-          <div
-            key={i}
-            className="h-2 w-2 animate-bounce rounded-full"
-            style={{ background: "var(--burgundy)", opacity: 0.5, animationDelay: `${i * 100}ms` }}
-          />
-        ))}
+      {/* Loading bar */}
+      <div
+        className="mt-6 w-64 relative overflow-hidden"
+        style={{ height: "1px", background: "var(--border)" }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            height: "100%",
+            width: "40%",
+            background: "var(--fg)",
+            animation: "loadingSlide 1.5s ease infinite",
+          }}
+        />
       </div>
 
       {/* Fun quip */}
-      <div className="mt-10 h-16 w-full max-w-sm">
-        <div
-          className="card text-center transition-opacity duration-300"
-          style={{ opacity: fade ? 1 : 0 }}
+      <div className="mt-10 w-full max-w-sm text-center">
+        <p
+          className="font-serif text-sm italic transition-opacity duration-300"
+          style={{
+            color: "var(--fg-faint)",
+            opacity: fade ? 1 : 0,
+          }}
         >
-          <p className="font-display text-sm italic" style={{ color: "var(--ink-muted)" }}>
-            {LOADING_QUIPS[quipIndex]}
-          </p>
-        </div>
+          {LOADING_QUIPS[quipIndex]}
+        </p>
       </div>
     </div>
   );
