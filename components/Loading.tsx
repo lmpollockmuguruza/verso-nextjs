@@ -3,28 +3,31 @@
 import { useState, useEffect } from "react";
 
 const LOADING_QUIPS = [
-  "Remember to drink water today",
-  "Have you stretched in the last hour?",
-  "Text someone you haven't talked to in a while",
-  "Fun fact: octopuses have three hearts",
-  "Did you know honey never spoils?",
-  "Time for a deep breath... in... and out",
-  "A group of flamingos is called a 'flamboyance'",
-  "Your posture could probably use some love",
-  "The mitochondria is the powerhouse of the cell",
-  "Have you told someone you appreciate them today?",
-  "Hot take: breakfast for dinner is elite",
-  "A cloud can weigh over a million pounds",
-  "Maybe go outside after this? Just a thought",
-  "You're doing great, by the way",
-  "Sea otters hold hands while sleeping",
-  "Reading papers counts as self-care, right?",
-  "Scotland's national animal is the unicorn",
-  "You've got this",
-  "A day on Venus is longer than its year",
-  "Maybe make some tea while you wait?",
-  "Elephants think humans are cute (allegedly)",
-  "Remember: correlation ≠ causation",
+  "this will age well in conversation",
+  "you're optimizing for depth, clearly",
+  "strong methodological energy",
+  "this is academically coherent, which is rare",
+  "you're building an argument whether you know it or not",
+  "this could become a minor obsession",
+  "the bibliography is forming",
+  "this has tenure-track undertones",
+  "not mainstream. intentional.",
+  "this feels peer-review adjacent",
+  "your future self will cite this",
+  "you're curating a very specific canon",
+  "this is quietly ambitious",
+  "respectfully, this is niche",
+  "ok polymath era",
+  "we're about to expand your personality",
+  "you're either ahead of the curve or about to start one",
+  "i see the vision. it's footnoted.",
+  "this might radicalize your reading list",
+  "this is either genius or a cry for help",
+  "remember: correlation ≠ causation",
+  "sea otters hold hands while sleeping",
+  "reading papers counts as self-care, right?",
+  "maybe make some tea while you wait?",
+  "you're doing great, by the way",
 ];
 
 interface LoadingProps {
@@ -120,7 +123,7 @@ export function FunLoading({ userName }: FunLoadingProps) {
             top: 0,
             height: "100%",
             width: "40%",
-            background: "var(--fg)",
+            background: "var(--accent)",
             animation: "loadingSlide 1.5s ease infinite",
           }}
         />
@@ -131,8 +134,8 @@ export function FunLoading({ userName }: FunLoadingProps) {
         <p
           className="font-serif text-sm italic transition-opacity duration-300"
           style={{
-            color: "var(--fg-faint)",
-            opacity: fade ? 1 : 0,
+            color: "var(--accent)",
+            opacity: fade ? 0.7 : 0,
           }}
         >
           {LOADING_QUIPS[quipIndex]}
