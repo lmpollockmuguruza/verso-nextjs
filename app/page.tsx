@@ -7,7 +7,7 @@ import {
   Brain, Key, CheckCircle, AlertCircle, ExternalLink,
   ChevronDown, Compass, Focus, Sun, Moon
 } from "lucide-react";
-import { ProgressDots, PaperCard, Loading, FunLoading, MultiSelect } from "@/components";
+import { ProgressDots, PaperCard, FunLoading, MultiSelect } from "@/components";
 import {
   getProfileOptions, getGroupedOptions,
   APPROACH_PREFERENCES, isGeneralistField, getMethodsByApproach
@@ -114,6 +114,14 @@ function useTheme() {
   }, [isDark]);
 
   return { isDark, toggle };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════════════════
+
+function toggleItem(arr: string[], item: string) {
+  return arr.includes(item) ? arr.filter((x) => x !== item) : [...arr, item];
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -272,35 +280,23 @@ export default function Home() {
     }
   };
 
-  // Results view uses wider layout
   const isResults = state.step === 8 && state.papers.length > 0 && !state.isLoading;
 
   return (
     <main style={{ minHeight: "100vh" }}>
-      {/* Top bar — theme toggle */}
-      <div
-        style={{
-          position: "fixed",
-          top: 0,
-          right: 0,
-          padding: "1rem 1.5rem",
-          zIndex: 50,
-        }}
-      >
+      <div style={{ position: "fixed", top: 0, right: 0, padding: "1rem 1.5rem", zIndex: 50 }}>
         <button onClick={toggleTheme} className="theme-toggle">
           {isDark ? <Sun className="inline h-3 w-3 mr-1" /> : <Moon className="inline h-3 w-3 mr-1" />}
           {isDark ? "Light" : "Dark"}
         </button>
       </div>
 
-      <div
-        style={{
-          maxWidth: isResults ? "760px" : "540px",
-          margin: "0 auto",
-          padding: isResults ? "2.5rem 1.5rem 4rem" : "4rem 1.5rem",
-          transition: "max-width 0.3s ease",
-        }}
-      >
+      <div style={{
+        maxWidth: isResults ? "760px" : "540px",
+        margin: "0 auto",
+        padding: isResults ? "2.5rem 1.5rem 4rem" : "4rem 1.5rem",
+        transition: "max-width 0.3s ease",
+      }}>
         {renderStep()}
       </div>
     </main>
@@ -326,18 +322,11 @@ interface StepProps {
 function StepWelcome({ state, updateState, nextStep }: StepProps) {
   return (
     <div className="animate-fade-in">
-      {/* Branding */}
       <div style={{ marginBottom: "3rem" }}>
-        <div
-          className="font-serif"
-          style={{ fontSize: "1.5rem", color: "var(--fg)", letterSpacing: "-0.02em" }}
-        >
+        <div className="font-serif" style={{ fontSize: "1.5rem", color: "var(--fg)", letterSpacing: "-0.02em" }}>
           verso
         </div>
-        <div
-          className="font-mono"
-          style={{ marginTop: "0.25rem", fontSize: "0.75rem", color: "var(--fg-faint)" }}
-        >
+        <div className="font-mono" style={{ marginTop: "0.25rem", fontSize: "0.75rem", color: "var(--fg-faint)" }}>
           recent research, surfaced for you
         </div>
       </div>
@@ -364,11 +353,7 @@ function StepWelcome({ state, updateState, nextStep }: StepProps) {
         />
 
         <div className="mt-8 flex justify-end">
-          <button
-            onClick={nextStep}
-            disabled={!state.name.trim()}
-            className="btn-primary"
-          >
+          <button onClick={nextStep} disabled={!state.name.trim()} className="btn-primary">
             Continue →
           </button>
         </div>
@@ -377,7 +362,7 @@ function StepWelcome({ state, updateState, nextStep }: StepProps) {
   );
 }
 
-// ─── STEP 2: LEVEL ───────────────────────────────────────────────────
+// ─── STEP 2: LEVEL — chip grid with hover-reveal groups ─────────────
 
 function StepLevel({ state, updateState, nextStep, prevStep }: StepProps) {
   return (
@@ -391,16 +376,16 @@ function StepLevel({ state, updateState, nextStep, prevStep }: StepProps) {
         No academic background needed — curious minds welcome.
       </p>
 
-      <div className="mt-6 space-y-3">
+      <div className="mt-6">
         {groupedOptions.academic_levels.groups.map((group) => (
-          <div key={group.label}>
-            <p className="label mb-2">{group.label}</p>
-            <div className="space-y-1">
+          <div key={group.label} className="option-group">
+            <div className="option-group-label">{group.label}</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.375rem" }}>
               {group.options.map((level) => (
                 <button
                   key={level}
                   onClick={() => updateState({ level })}
-                  className={`option-btn ${state.level === level ? "selected" : ""}`}
+                  className={`chip ${state.level === level ? "selected" : ""}`}
                 >
                   {level}
                 </button>
@@ -415,7 +400,7 @@ function StepLevel({ state, updateState, nextStep, prevStep }: StepProps) {
   );
 }
 
-// ─── STEP 3: FIELD ───────────────────────────────────────────────────
+// ─── STEP 3: FIELD — chip grid with hover-reveal groups ──────────────
 
 function StepField({ state, updateState, nextStep, prevStep }: StepProps) {
   const isGeneralist = isGeneralistField(state.field);
@@ -429,16 +414,16 @@ function StepField({ state, updateState, nextStep, prevStep }: StepProps) {
         Pick a focus area, or explore broadly.
       </p>
 
-      <div className="mt-6 space-y-4">
+      <div className="mt-6">
         {groupedOptions.primary_fields.groups.map((group) => (
-          <div key={group.label}>
-            <p className="label mb-2">{group.label}</p>
-            <div className="space-y-1">
+          <div key={group.label} className="option-group">
+            <div className="option-group-label">{group.label}</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.375rem" }}>
               {group.options.map((field) => (
                 <button
                   key={field}
                   onClick={() => updateState({ field })}
-                  className={`option-btn ${state.field === field ? "selected" : ""}`}
+                  className={`chip ${state.field === field ? "selected" : ""}`}
                 >
                   {field}
                 </button>
@@ -449,10 +434,10 @@ function StepField({ state, updateState, nextStep, prevStep }: StepProps) {
       </div>
 
       {isGeneralist && (
-        <div className="mt-4 card-cream" style={{ fontSize: "0.8125rem" }}>
-          <Lightbulb className="inline h-3.5 w-3.5 mr-1.5" style={{ color: "var(--accent)" }} />
-          <span style={{ color: "var(--accent)" }}>Great choice!</span>{" "}
-          <span style={{ color: "var(--fg-muted)" }}>We will show you quality research from across disciplines.</span>
+        <div className="mt-4 card-accent" style={{ fontSize: "0.8125rem" }}>
+          <Lightbulb className="inline h-3.5 w-3.5 mr-1" style={{ color: "var(--accent)" }} />
+          <span style={{ color: "var(--accent)" }}>Great choice.</span>{" "}
+          <span style={{ color: "var(--fg-muted)" }}>Quality research from across disciplines.</span>
         </div>
       )}
 
@@ -465,9 +450,9 @@ function StepField({ state, updateState, nextStep, prevStep }: StepProps) {
 
 function StepApproach({ state, updateState, nextStep, prevStep }: StepProps) {
   const explorationLabels = [
-    { value: 0, icon: Focus, label: "Narrow", desc: "Only papers directly in my areas" },
-    { value: 0.5, icon: Sparkles, label: "Balanced", desc: "Relevant papers with some surprises" },
-    { value: 1, icon: Compass, label: "Exploratory", desc: "Surprise me with quality from adjacent fields" },
+    { value: 0, label: "Narrow", desc: "Only papers directly in my areas" },
+    { value: 0.5, label: "Balanced", desc: "Relevant papers with some surprises" },
+    { value: 1, label: "Exploratory", desc: "Surprise me with quality from adjacent fields" },
   ];
 
   return (
@@ -480,7 +465,6 @@ function StepApproach({ state, updateState, nextStep, prevStep }: StepProps) {
         Choose your research approach and discovery preference.
       </p>
 
-      {/* Research approach */}
       <p className="label mt-6 mb-2">Research Type</p>
       <div className="space-y-1">
         {APPROACH_PREFERENCES.map((pref) => (
@@ -501,15 +485,11 @@ function StepApproach({ state, updateState, nextStep, prevStep }: StepProps) {
         ))}
       </div>
 
-      {/* Exploration slider */}
       <div className="mt-8">
         <p className="label mb-3">Discovery Preference</p>
         <div className="card" style={{ padding: "1.25rem 1rem" }}>
           <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
+            type="range" min={0} max={1} step={0.05}
             value={state.explorationLevel}
             onChange={(e) => updateState({ explorationLevel: parseFloat(e.target.value) })}
             className="w-full"
@@ -538,86 +518,141 @@ function StepApproach({ state, updateState, nextStep, prevStep }: StepProps) {
   );
 }
 
-// ─── STEP 5: INTERESTS ───────────────────────────────────────────────
+// ─── STEP 5: INTERESTS — inline chip grid ────────────────────────────
 
 function StepInterests({ state, updateState, nextStep, prevStep }: StepProps) {
   const isGeneralist = isGeneralistField(state.field);
+  const maxSelections = 5;
+  const atMax = state.interests.length >= maxSelections;
+
   return (
     <div className="animate-fade-in">
       <ProgressDots current={5} total={TOTAL_STEPS} />
       <div className="flex items-start justify-between">
         <div>
           <h2 className="font-serif" style={{ fontSize: "1.25rem", color: "var(--fg)" }}>Any specific topics?</h2>
-          <p className="mt-1 text-sm" style={{ color: "var(--fg-muted)" }}>Select up to 5 topics — or skip to see everything.</p>
+          <p className="mt-1 text-sm" style={{ color: "var(--fg-muted)" }}>
+            Select up to {maxSelections} — or skip to see everything.
+          </p>
         </div>
         <span className="tag tag-accent font-mono">Optional</span>
       </div>
 
-      <div className="mt-6">
-        <MultiSelect
-          options={profileOptions.interests}
-          selected={state.interests}
-          onChange={(interests) => updateState({ interests })}
-          placeholder="Search topics..."
-          maxSelections={5}
-          groups={groupedOptions.interests.groups}
-        />
-      </div>
-
       {state.interests.length > 0 && (
-        <p className="mt-3 font-mono text-xs" style={{ color: "var(--fg-faint)" }}>
-          First selections are weighted more heavily.
-        </p>
+        <div className="mt-4 font-mono" style={{ fontSize: "0.6875rem", color: "var(--fg-faint)" }}>
+          {state.interests.length}/{maxSelections} selected
+          {state.interests.length > 0 && " · first selections weighted more"}
+        </div>
       )}
 
-      <div className="mt-6 flex justify-between items-center">
+      <div className="mt-4">
+        {groupedOptions.interests.groups.map((group) => (
+          <div key={group.label} className="option-group">
+            <div className="option-group-label">{group.label}</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.375rem" }}>
+              {group.options.map((interest) => {
+                const isSelected = state.interests.includes(interest);
+                return (
+                  <button
+                    key={interest}
+                    onClick={() => {
+                      if (isSelected || !atMax) {
+                        updateState({ interests: toggleItem(state.interests, interest) });
+                      }
+                    }}
+                    disabled={!isSelected && atMax}
+                    className={`chip ${isSelected ? "selected" : ""}`}
+                  >
+                    {interest}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-8 flex justify-between items-center">
         <button onClick={prevStep} className="btn-ghost">← Back</button>
-        <div className="flex gap-2">
-          {state.interests.length === 0 ? (
-            <button onClick={nextStep} className="btn-secondary">
-              Skip <SkipForward className="h-3.5 w-3.5" />
-            </button>
-          ) : (
-            <button onClick={nextStep} className="btn-primary">Continue →</button>
-          )}
-        </div>
+        {state.interests.length === 0 ? (
+          <button onClick={nextStep} className="btn-secondary">
+            Skip <SkipForward className="h-3.5 w-3.5" />
+          </button>
+        ) : (
+          <button onClick={nextStep} className="btn-primary">Continue →</button>
+        )}
       </div>
       {isGeneralist && state.interests.length === 0 && (
         <p className="mt-4 text-center font-mono text-xs" style={{ color: "var(--fg-faint)" }}>
-          As a generalist, skipping is fine — you will see quality papers from across fields.
+          As a generalist, skipping is fine — quality papers from across fields.
         </p>
       )}
     </div>
   );
 }
 
-// ─── STEP 6: METHODS ─────────────────────────────────────────────────
+// ─── STEP 6: METHODS — inline chip grid ──────────────────────────────
 
 function StepMethods({ state, updateState, nextStep, prevStep }: StepProps) {
   const availableMethods = getMethodsByApproach(state.approachPreference);
+  const maxSelections = 4;
+  const atMax = state.methods.length >= maxSelections;
+
+  // Build groups from available methods
+  const methodGroups = groupedOptions.methods.groups
+    .map((group) => ({
+      ...group,
+      options: group.options.filter((m) => availableMethods.includes(m)),
+    }))
+    .filter((group) => group.options.length > 0);
+
   return (
     <div className="animate-fade-in">
       <ProgressDots current={6} total={TOTAL_STEPS} />
       <div className="flex items-start justify-between">
         <div>
           <h2 className="font-serif" style={{ fontSize: "1.25rem", color: "var(--fg)" }}>Preferred methodologies?</h2>
-          <p className="mt-1 text-sm" style={{ color: "var(--fg-muted)" }}>Select up to 4 methods — or skip if open to all.</p>
+          <p className="mt-1 text-sm" style={{ color: "var(--fg-muted)" }}>
+            Select up to {maxSelections} — or skip if open to all.
+          </p>
         </div>
         <span className="tag tag-accent font-mono">Optional</span>
       </div>
 
-      <div className="mt-6">
-        <MultiSelect
-          options={availableMethods}
-          selected={state.methods}
-          onChange={(methods) => updateState({ methods })}
-          placeholder="Search methods..."
-          maxSelections={4}
-          groups={groupedOptions.methods.groups}
-        />
+      {state.methods.length > 0 && (
+        <div className="mt-4 font-mono" style={{ fontSize: "0.6875rem", color: "var(--fg-faint)" }}>
+          {state.methods.length}/{maxSelections} selected
+        </div>
+      )}
+
+      <div className="mt-4">
+        {methodGroups.map((group) => (
+          <div key={group.label} className="option-group">
+            <div className="option-group-label">{group.label}</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.375rem" }}>
+              {group.options.map((method) => {
+                const isSelected = state.methods.includes(method);
+                return (
+                  <button
+                    key={method}
+                    onClick={() => {
+                      if (isSelected || !atMax) {
+                        updateState({ methods: toggleItem(state.methods, method) });
+                      }
+                    }}
+                    disabled={!isSelected && atMax}
+                    className={`chip ${isSelected ? "selected" : ""}`}
+                  >
+                    {method}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
 
-      <div className="mt-6 flex justify-between items-center">
+      <div className="mt-8 flex justify-between items-center">
         <button onClick={prevStep} className="btn-ghost">← Back</button>
         {state.methods.length === 0 ? (
           <button onClick={nextStep} className="btn-secondary">
@@ -643,7 +678,6 @@ function StepSources({ state, updateState, nextStep, prevStep, discoverPapers }:
     adjacentFields: JournalField[]
   ) => {
     let selected = getSmartJournalDefaults(state.field, fieldType, includeWPs);
-
     if (fieldType === "Political Science") {
       const polisciJournals = [
         ...Object.keys(journalOptions.polisci.tier1 ? {} : {}),
@@ -652,12 +686,10 @@ function StepSources({ state, updateState, nextStep, prevStep, discoverPapers }:
       const wpJournals = includeWPs ? getWorkingPapers() : [];
       selected = [...new Set([...polisciJournals, ...wpJournals])];
     }
-
     for (const field of adjacentFields) {
       const adjacentJournals = getJournalsByTier(field, [1, 2]);
       selected = [...selected, ...adjacentJournals];
     }
-
     return [...new Set(selected)];
   };
 
@@ -714,10 +746,7 @@ function StepSources({ state, updateState, nextStep, prevStep, discoverPapers }:
 
       {/* Working Papers */}
       <div className="mt-6">
-        <label
-          className="flex items-center gap-3 cursor-pointer card-accent"
-          style={{ padding: "0.75rem" }}
-        >
+        <label className="flex items-center gap-3 cursor-pointer card-accent" style={{ padding: "0.75rem" }}>
           <input type="checkbox" checked={state.includeWorkingPapers} onChange={toggleWorkingPapers} />
           <div className="flex-1">
             <span style={{ fontWeight: 500, color: "var(--fg)" }}>Working Papers</span>
@@ -730,22 +759,13 @@ function StepSources({ state, updateState, nextStep, prevStep, discoverPapers }:
       {/* Field Selection */}
       <div className="mt-5">
         <p className="label mb-2">Published Journals</p>
-        <div className="flex gap-1">
+        <div style={{ display: "flex", gap: "0.25rem" }}>
           {(["Economics", "Political Science", "Both"] as const).map((type) => (
             <button
               key={type}
               onClick={() => setFieldType(type)}
-              className="font-mono flex-1 text-center"
-              style={{
-                fontSize: "0.8125rem",
-                padding: "0.375rem 0.5rem",
-                border: "1px solid",
-                borderColor: state.fieldType === type ? "var(--fg)" : "var(--border)",
-                background: state.fieldType === type ? "var(--fg)" : "transparent",
-                color: state.fieldType === type ? "var(--bg)" : "var(--fg-muted)",
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-              }}
+              className={`chip flex-1 justify-center ${state.fieldType === type ? "selected" : ""}`}
+              style={{ fontSize: "0.8125rem" }}
             >
               {type}
             </button>
@@ -753,7 +773,7 @@ function StepSources({ state, updateState, nextStep, prevStep, discoverPapers }:
         </div>
       </div>
 
-      {/* Journal Picker Toggle */}
+      {/* Journal Picker */}
       <div className="mt-4">
         <button
           onClick={() => setShowJournalPicker(!showJournalPicker)}
@@ -787,20 +807,15 @@ function StepSources({ state, updateState, nextStep, prevStep, discoverPapers }:
           Include related fields
         </button>
         {showAdjacentOptions && (
-          <div className="mt-3 space-y-1">
+          <div className="mt-3" style={{ display: "flex", gap: "0.375rem" }}>
             {(["psychology", "sociology", "management"] as JournalField[]).map((field) => (
-              <label
+              <button
                 key={field}
-                className="flex items-center gap-3 cursor-pointer card"
-                style={{ padding: "0.625rem 0.75rem" }}
+                onClick={() => toggleAdjacentField(field)}
+                className={`chip capitalize ${state.selectedAdjacentFields.includes(field) ? "selected" : ""}`}
               >
-                <input
-                  type="checkbox"
-                  checked={state.selectedAdjacentFields.includes(field)}
-                  onChange={() => toggleAdjacentField(field)}
-                />
-                <span className="text-sm capitalize">{field}</span>
-              </label>
+                {field}
+              </button>
             ))}
           </div>
         )}
@@ -859,15 +874,9 @@ function StepSources({ state, updateState, nextStep, prevStep, discoverPapers }:
                   onChange={(e) => updateState({ geminiApiKey: e.target.value, aiKeyValid: null, aiError: null })}
                   placeholder="Paste your API key"
                   style={{
-                    flex: 1,
-                    fontSize: "0.8125rem",
-                    fontFamily: "var(--font-mono)",
-                    padding: "0.375rem 0.5rem",
-                    border: "none",
-                    borderBottom: "1px solid var(--border)",
-                    background: "transparent",
-                    color: "var(--fg)",
-                    outline: "none",
+                    flex: 1, fontSize: "0.8125rem", fontFamily: "var(--font-mono)",
+                    padding: "0.375rem 0.5rem", border: "none", borderBottom: "1px solid var(--border)",
+                    background: "transparent", color: "var(--fg)", outline: "none",
                   }}
                 />
                 <button
@@ -917,7 +926,7 @@ function StepSources({ state, updateState, nextStep, prevStep, discoverPapers }:
                 <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
               </select>
             </div>
-            <div className="card-cream" style={{ fontSize: "0.75rem" }}>
+            <div className="card-accent" style={{ fontSize: "0.75rem" }}>
               <p style={{ fontWeight: 500, color: "var(--accent)" }}>Get a free API key (1 minute):</p>
               <ol className="mt-1.5 space-y-0.5" style={{ color: "var(--fg-muted)", listStyle: "decimal inside" }}>
                 <li>Go to <a href="https://aistudio.google.com" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", textDecoration: "underline", textUnderlineOffset: "2px" }}>Google AI Studio <ExternalLink className="inline h-2.5 w-2.5" /></a></li>
@@ -929,11 +938,8 @@ function StepSources({ state, updateState, nextStep, prevStep, discoverPapers }:
         )}
       </div>
 
-      {/* Summary + Discover */}
-      <div
-        className="mt-5 card font-mono"
-        style={{ fontSize: "0.75rem", color: "var(--fg-muted)" }}
-      >
+      {/* Summary */}
+      <div className="mt-5 card font-mono" style={{ fontSize: "0.75rem", color: "var(--fg-muted)" }}>
         <Search className="mr-1.5 inline h-3.5 w-3.5" />
         Searching {state.journals.length} sources
         {state.includeWorkingPapers && <span style={{ color: "var(--accent)" }}> (incl. working papers)</span>}
@@ -943,11 +949,7 @@ function StepSources({ state, updateState, nextStep, prevStep, discoverPapers }:
 
       <div className="mt-6 flex justify-between items-center">
         <button onClick={prevStep} className="btn-ghost">← Back</button>
-        <button
-          onClick={handleDiscover}
-          disabled={state.journals.length === 0}
-          className="btn-accent"
-        >
+        <button onClick={handleDiscover} disabled={state.journals.length === 0} className="btn-accent">
           <Sparkles className="h-3.5 w-3.5" /> Find papers →
         </button>
       </div>
@@ -1010,20 +1012,11 @@ function StepResults({ state, updateState, startOver, discoverPapers, goToStep }
   return (
     <div className="animate-fade-in">
       {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          paddingBottom: "1.25rem",
-          borderBottom: "1px solid var(--border)",
-        }}
-      >
-        <div>
-          <div className="font-serif" style={{ fontSize: "1.375rem", color: "var(--fg)", letterSpacing: "-0.02em" }}>
-            verso
-          </div>
-        </div>
+      <div style={{
+        display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+        paddingBottom: "1.25rem", borderBottom: "1px solid var(--border)",
+      }}>
+        <div className="font-serif" style={{ fontSize: "1.375rem", color: "var(--fg)", letterSpacing: "-0.02em" }}>verso</div>
         <div className="flex gap-3 items-center">
           <span className="font-mono" style={{ fontSize: "0.6875rem", color: "var(--fg-faint)" }}>
             {state.name}
@@ -1034,15 +1027,10 @@ function StepResults({ state, updateState, startOver, discoverPapers, goToStep }
       </div>
 
       {/* Summary bar */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "0.875rem 0",
-          borderBottom: "1px solid var(--border)",
-        }}
-      >
+      <div style={{
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        padding: "0.875rem 0", borderBottom: "1px solid var(--border)",
+      }}>
         <div className="font-mono" style={{ fontSize: "0.6875rem", color: "var(--fg-faint)", display: "flex", gap: "1rem" }}>
           <span>{allPapers.length} papers</span>
           <span>·</span>
@@ -1056,49 +1044,19 @@ function StepResults({ state, updateState, startOver, discoverPapers, goToStep }
             </>
           )}
         </div>
-        <div style={{ display: "flex", gap: "0.125rem" }}>
-          {[
-            { key: "all", label: `All (${allPapers.length})` },
-            { key: "core", label: `Core (${coreCount})` },
-            { key: "explore", label: `Explore (${exploreCount})` },
-            { key: "discovery", label: `Discovery (${discoveryCount})` },
-          ].map(({ key, label }) => {
-            // Use state to track filter within results
-            const isActive = (!showAll && key === "all") || false;
-            return (
-              <span
-                key={key}
-                className="font-mono"
-                style={{
-                  fontSize: "0.6875rem",
-                  padding: "0.25rem 0.5rem",
-                  color: "var(--fg-muted)",
-                  letterSpacing: "0.04em",
-                  textTransform: "uppercase" as const,
-                }}
-              >
-                {label}
-              </span>
-            );
-          })}
+        <div className="font-mono" style={{ fontSize: "0.6875rem", color: "var(--fg-faint)", display: "flex", gap: "0.75rem" }}>
+          <span>Core {coreCount}</span>
+          <span>Explore {exploreCount}</span>
+          <span>Discovery {discoveryCount}</span>
         </div>
       </div>
 
       {/* Column headers */}
-      <div
-        className="font-mono"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "2.8rem 1fr auto",
-          gap: "1rem",
-          padding: "0.5rem 0",
-          borderBottom: "1px solid var(--border)",
-          fontSize: "0.625rem",
-          textTransform: "uppercase" as const,
-          letterSpacing: "0.08em",
-          color: "var(--fg-faint)",
-        }}
-      >
+      <div className="font-mono" style={{
+        display: "grid", gridTemplateColumns: "2.8rem 1fr auto",
+        gap: "1rem", padding: "0.5rem 0", borderBottom: "1px solid var(--border)",
+        fontSize: "0.625rem", textTransform: "uppercase" as const, letterSpacing: "0.08em", color: "var(--fg-faint)",
+      }}>
         <span>Score</span>
         <span>Paper</span>
         <span>Type</span>
@@ -1107,12 +1065,7 @@ function StepResults({ state, updateState, startOver, discoverPapers, goToStep }
       {/* Paper list */}
       <div>
         {displayPapers.map((paper, index) => (
-          <PaperCard
-            key={paper.id}
-            paper={paper}
-            index={index}
-            compact={showAll && index >= TOP_DISPLAY}
-          />
+          <PaperCard key={paper.id} paper={paper} index={index} compact={showAll && index >= TOP_DISPLAY} />
         ))}
       </div>
 
@@ -1122,13 +1075,8 @@ function StepResults({ state, updateState, startOver, discoverPapers, goToStep }
           onClick={() => setShowAll(true)}
           className="w-full font-mono mt-4"
           style={{
-            fontSize: "0.75rem",
-            padding: "0.625rem",
-            border: "1px solid var(--border)",
-            background: "transparent",
-            color: "var(--fg-muted)",
-            cursor: "pointer",
-            transition: "all 0.15s ease",
+            fontSize: "0.75rem", padding: "0.625rem", border: "1px solid var(--border)",
+            background: "transparent", color: "var(--fg-muted)", cursor: "pointer",
           }}
           onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--border-strong)"; }}
           onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; }}
@@ -1144,25 +1092,15 @@ function StepResults({ state, updateState, startOver, discoverPapers, goToStep }
         </div>
       )}
 
-      {/* Actions */}
       <div className="mt-4 flex gap-3 justify-center">
         <button onClick={() => goToStep(7)} className="btn-secondary">← Adjust</button>
         <button onClick={startOver} className="btn-ghost"><RotateCcw className="h-3 w-3" /> Start over</button>
       </div>
 
-      {/* Footer */}
-      <div
-        className="font-mono"
-        style={{
-          marginTop: "2rem",
-          paddingTop: "1rem",
-          borderTop: "1px solid var(--border)",
-          display: "flex",
-          justifyContent: "space-between",
-          fontSize: "0.6875rem",
-          color: "var(--fg-faint)",
-        }}
-      >
+      <div className="font-mono" style={{
+        marginTop: "2rem", paddingTop: "1rem", borderTop: "1px solid var(--border)",
+        display: "flex", justifyContent: "space-between", fontSize: "0.6875rem", color: "var(--fg-faint)",
+      }}>
         <span>Data via OpenAlex · Scored by relevance algorithm</span>
         <span>verso</span>
       </div>
@@ -1171,7 +1109,7 @@ function StepResults({ state, updateState, startOver, discoverPapers, goToStep }
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// SHARED COMPONENTS
+// SHARED
 // ═══════════════════════════════════════════════════════════════════════
 
 function Nav({ onBack, onNext, nextLabel = "Continue →", nextDisabled = false }: {
