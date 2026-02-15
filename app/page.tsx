@@ -324,6 +324,17 @@ export default function Home() {
         padding: isResults ? "2.5rem 1.5rem 4rem" : "4rem 1.5rem",
         transition: "max-width 0.3s ease",
       }}>
+        {/* Persistent logo header for setup steps */}
+        {!isResults && (
+          <div style={{ marginBottom: state.step === 1 ? "3rem" : "1.5rem" }}>
+            <VersoLogo size={state.step === 1 ? "1.5rem" : "1.125rem"} />
+            {state.step === 1 && (
+              <div className="font-mono" style={{ marginTop: "0.25rem", fontSize: "0.75rem", color: "var(--fg-faint)" }}>
+                recent research, surfaced for you
+              </div>
+            )}
+          </div>
+        )}
         {renderStep()}
       </div>
     </main>
@@ -349,13 +360,6 @@ interface StepProps {
 function StepWelcome({ state, updateState, nextStep }: StepProps) {
   return (
     <div className="animate-fade-in">
-      <div style={{ marginBottom: "3rem" }}>
-        <VersoLogo size="1.5rem" />
-        <div className="font-mono" style={{ marginTop: "0.25rem", fontSize: "0.75rem", color: "var(--fg-faint)" }}>
-          recent research, surfaced for you
-        </div>
-      </div>
-
       <ProgressDots current={1} total={TOTAL_STEPS} />
 
       <div>
@@ -564,9 +568,9 @@ function StepInterests({ state, updateState, nextStep, prevStep }: StepProps) {
       </div>
 
       {state.interests.length > 0 && (
-        <div className="mt-4 font-mono" style={{ fontSize: "0.6875rem", color: "var(--fg-faint)" }}>
+        <div className="mt-4 font-mono" style={{ fontSize: "0.6875rem", color: "var(--accent)" }}>
           {state.interests.length}/{maxSelections} selected
-          {state.interests.length > 0 && " · first selections weighted more"}
+          {state.interests.length > 0 && <span style={{ color: "var(--fg-faint)" }}> · first selections weighted more</span>}
         </div>
       )}
 
@@ -645,7 +649,7 @@ function StepMethods({ state, updateState, nextStep, prevStep }: StepProps) {
       </div>
 
       {state.methods.length > 0 && (
-        <div className="mt-4 font-mono" style={{ fontSize: "0.6875rem", color: "var(--fg-faint)" }}>
+        <div className="mt-4 font-mono" style={{ fontSize: "0.6875rem", color: "var(--accent)" }}>
           {state.methods.length}/{maxSelections} selected
         </div>
       )}
